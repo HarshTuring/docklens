@@ -1,5 +1,10 @@
 from flask import Blueprint, request, jsonify, current_app
-from app.utils.helpers import save_uploaded_file, get_image_response
+from app.utils.helpers import (
+    save_uploaded_file, 
+    get_image_response, 
+    is_valid_image_url, 
+    download_image_from_url
+)
 from app.core.image_processor import process_image, convert_to_grayscale
 
 image_bp = Blueprint('image', __name__)
@@ -57,6 +62,49 @@ def grayscale_image():
     
     if not file_path:
         return jsonify({'error': 'File type not allowed'}), 400
+    
+    # Convert to grayscale
+    processed_path = convert_to_grayscale(file_path)
+    
+    if processed_path:
+        # Return the processed image directly
+        image_response = get_image_response(processed_path)
+        if image_response:
+            return image_response
+    
+    return jsonify({'error': 'Error processing image'}), 500
+
+@image_bp.route('/grayscale-url', methods=['POST'])
+def grayscale_image_from_url():
+    """
+    Convert image from URL to grayscale and return the processed image.
+    
+    Data flow:
+    1. Download image from URL
+    2. Process image (convert to grayscale)
+    3. Return processed image directly
+    
+    Expected JSON payload:
+    {
+        "url": "https://example.com/image.jpg"
+    }
+    """
+    # Get URL from request
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({'error': 'No URL provided'}), 400
+    
+    image_url = data['url']
+    
+    # Validate URL
+    if not is_valid_image_url(image_url):
+        return jsonify({'error': 'Invalid image URL'}), 400
+    
+    # Download image from URL
+    _, file_path = download_image_from_url(image_url)
+    
+    if not file_path:
+        return jsonify({'error': 'Could not download image from URL'}), 400
     
     # Convert to grayscale
     processed_path = convert_to_grayscale(file_path)
