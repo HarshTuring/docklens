@@ -1,0 +1,46 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Uploads and processed images
+uploads/*
+!uploads/.gitkeep
+static/processed_images/*
+!static/processed_images/.gitkeep
+
+# Virtual Environment
+venv/
+ENV/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment variables
+.env
+.env.local
+
+# Docker
+.dockerignore
+
+# Logs
+*.log
