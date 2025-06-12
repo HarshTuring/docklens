@@ -7,10 +7,41 @@ from app.utils.helpers import (
 )
 from app.utils.logger import log_operation, get_operation_logs
 from app.core.image_processor import process_image, convert_to_grayscale
+from flasgger import swag_from
 
 image_bp = Blueprint('image', __name__)
 
 @image_bp.route('/upload', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Upload an image file",
+    "description": "Upload an image file to the server",
+    "consumes": ["multipart/form-data"],
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "image",
+            "in": "formData",
+            "description": "Image file to upload",
+            "required": True,
+            "type": "file"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Image successfully uploaded",
+            "schema": {
+                "$ref": "#/components/schemas/UploadResponse"
+            }
+        },
+        "400": {
+            "description": "Bad request",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
 def upload_image():
     """Handle image upload via POST request."""
     # Check if request has the file part
@@ -56,6 +87,47 @@ def upload_image():
     return jsonify({'error': 'File type not allowed'}), 400
 
 @image_bp.route('/grayscale', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Convert uploaded image to grayscale",
+    "description": "Upload an image and convert it to grayscale. Returns the processed image directly.",
+    "consumes": ["multipart/form-data"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "image",
+            "in": "formData",
+            "description": "Image file to convert to grayscale",
+            "required": True,
+            "type": "file"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Grayscale image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
 def grayscale_image():
     """
     Convert uploaded image to grayscale and return the processed image.
@@ -109,6 +181,56 @@ def grayscale_image():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/grayscale-url', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Convert image from URL to grayscale",
+    "description": "Fetch an image from the provided URL and convert it to grayscale. Returns the processed image directly.",
+    "consumes": ["application/json"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "description": "URL of the image to convert",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL of the image"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Grayscale image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request or invalid URL",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
 def grayscale_image_from_url():
     """
     Convert image from URL to grayscale and return the processed image.
@@ -176,6 +298,56 @@ def grayscale_image_from_url():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/logs', methods=['GET'])
+@swag_from({
+    "tags": ["Logs"],
+    "summary": "Get operation logs",
+    "description": "Retrieve logs of image processing operations with optional filtering",
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of logs to return",
+            "required": False,
+            "type": "integer",
+            "default": 100
+        },
+        {
+            "name": "operation",
+            "in": "query",
+            "description": "Filter logs by operation type (e.g., 'upload', 'grayscale')",
+            "required": False,
+            "type": "string"
+        },
+        {
+            "name": "source",
+            "in": "query",
+            "description": "Filter logs by source type (e.g., 'upload', 'url')",
+            "required": False,
+            "type": "string"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "List of operation logs",
+            "schema": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "timestamp": {"type": "string"},
+                        "unix_timestamp": {"type": "integer"},
+                        "image_name": {"type": "string"},
+                        "operation": {"type": "string"},
+                        "source_type": {"type": "string"},
+                        "status": {"type": "string"},
+                        "details": {"type": "object"}
+                    }
+                }
+            }
+        }
+    }
+})
 def get_logs():
     """Get operation logs with optional filtering."""
     # Parse query parameters
