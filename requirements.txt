@@ -5,3 +5,4 @@ Pillow
 gunicorn
 requests
 flasgger
+pymongo==4.5.0

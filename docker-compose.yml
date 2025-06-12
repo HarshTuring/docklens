@@ -2,24 +2,41 @@ version: '3.8'
 
 services:
   app:
-    build: 
+    build:
       context: .
       dockerfile: Dockerfile
-    container_name: image-processor
     ports:
       - "5001:5001"
-    volumes:
-      - uploads:/app/uploads
-      - processed:/app/static/processed_images
-      - logs:/app/logs
     environment:
-      - FLASK_ENV=prod
+      - FLASK_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/image_processing
+    volumes:
+      - ./uploads:/app/uploads
+      - ./static:/app/static
+      - ./logs:/app/logs
+    depends_on:
+      - mongo
     restart: unless-stopped
+    networks:
+      - app-network
+
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME:-admin}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD:-password}
+    restart: unless-stopped
+    networks:
+      - app-network
 
 volumes:
-  uploads:
+  mongodb_data:
     driver: local
-  processed:
-    driver: local
-  logs:
-    driver: local
+
+networks:
+  app-network:
+    driver: bridge

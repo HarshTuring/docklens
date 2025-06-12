@@ -6,6 +6,7 @@ class Config:
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload size
     LOG_DIR = 'logs'
+    MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/image_processing')
 
 class DevelopmentConfig(Config):
     """Development config."""
