@@ -1,9 +1,23 @@
+# .dockerignore
+
+# Git
+.git
+.gitignore
+
+# Docker
+.dockerignore
+Dockerfile
+docker-compose.yml
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
 env/
+venv/
+ENV/
 build/
 develop-eggs/
 dist/
@@ -19,16 +33,9 @@ var/
 .installed.cfg
 *.egg
 
-# Uploads and processed images
+# Content directories (these will be mounted as volumes)
 uploads/*
-app/static/*
-!uploads/.gitkeep
 static/processed_images/*
-!static/processed_images/.gitkeep
-
-# Virtual Environment
-venv/
-ENV/
 
 # IDE specific files
 .idea/
@@ -36,7 +43,7 @@ ENV/
 *.swp
 *.swo
 
-# Environment variables
+# Local env files
 .env
 .env.local
 

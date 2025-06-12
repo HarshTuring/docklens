@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: image-processor
+    ports:
+      - "5001:5001"
+    volumes:
+      - uploads:/app/uploads
+      - processed:/app/static/processed_images
+    environment:
+      - FLASK_ENV=prod
+    restart: unless-stopped
+
+volumes:
+  uploads:
+    driver: local
+  processed:
+    driver: local
