@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
-from app.utils.helpers import save_uploaded_file
-from app.core.image_processor import process_image
+from app.utils.helpers import save_uploaded_file, get_image_response
+from app.core.image_processor import process_image, convert_to_grayscale
 
 image_bp = Blueprint('image', __name__)
 
@@ -31,3 +31,40 @@ def upload_image():
         }), 200
     
     return jsonify({'error': 'File type not allowed'}), 400
+
+@image_bp.route('/grayscale', methods=['POST'])
+def grayscale_image():
+    """
+    Convert uploaded image to grayscale and return the processed image.
+    
+    Data flow:
+    1. Upload the image
+    2. Process image (convert to grayscale)
+    3. Return processed image directly
+    """
+    # Check if request has the file part
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image part in the request'}), 400
+    
+    file = request.files['image']
+    
+    # Check if file is selected
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Save the file if it's allowed
+    _, file_path = save_uploaded_file(file)
+    
+    if not file_path:
+        return jsonify({'error': 'File type not allowed'}), 400
+    
+    # Convert to grayscale
+    processed_path = convert_to_grayscale(file_path)
+    
+    if processed_path:
+        # Return the processed image directly
+        image_response = get_image_response(processed_path)
+        if image_response:
+            return image_response
+    
+    return jsonify({'error': 'Error processing image'}), 500

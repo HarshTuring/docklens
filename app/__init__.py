@@ -9,8 +9,9 @@ def create_app(config_name=None):
     # Load config
     app.config.from_object(get_config())
     
-    # Ensure upload directory exists
+    # Ensure directories exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    os.makedirs(os.path.join(app.static_folder, 'processed_images'), exist_ok=True)
     
     # Register blueprints
     from app.api.routes import api_bp
