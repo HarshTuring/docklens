@@ -44,11 +44,9 @@ def log_operation(image_name, operation, source_type, status='success', details=
         'image_name': image_name,
         'operation': operation,
         'source_type': source_type,
-        'status': status
+        'status': status,
+        'details': details if details is not None else {}
     }
-    
-    if details:
-        log_entry.update(details)
     
     log_file = initialize_log_file()
     

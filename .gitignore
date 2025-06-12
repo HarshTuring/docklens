@@ -21,6 +21,7 @@ var/
 
 # Uploads and processed images
 uploads/*
+*/uploads/*
 app/static/*
 !uploads/.gitkeep
 static/processed_images/*
