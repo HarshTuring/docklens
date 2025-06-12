@@ -12,6 +12,7 @@ def create_app(config_name=None):
     # Ensure directories exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(os.path.join(app.static_folder, 'processed_images'), exist_ok=True)
+    os.makedirs(os.path.join(app.root_path, app.config['LOG_DIR']), exist_ok=True)
     
     # Register blueprints
     from app.api.routes import api_bp

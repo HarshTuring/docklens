@@ -2,6 +2,7 @@ from PIL import Image
 import os
 import uuid
 from flask import current_app
+from app.utils.logger import log_operation
 
 def process_image(file_path):
     """
@@ -13,6 +14,15 @@ def process_image(file_path):
     Returns:
         dict: Processing results
     """
+    # Log the operation
+    image_name = os.path.basename(file_path)
+    log_operation(
+        image_name=image_name,
+        operation="register",
+        source_type="upload",
+        details={"file_path": file_path}
+    )
+    
     # This is just a placeholder for future image processing
     return {
         'status': 'processed',
@@ -20,12 +30,13 @@ def process_image(file_path):
         'file': file_path
     }
 
-def convert_to_grayscale(file_path):
+def convert_to_grayscale(file_path, source_type="upload"):
     """
     Convert an image to grayscale.
     
     Args:
         file_path: Path to the image to be converted
+        source_type: Source of the image (upload, url)
         
     Returns:
         str: Path to the processed image
@@ -49,7 +60,30 @@ def convert_to_grayscale(file_path):
         # Save the grayscale image
         gray_img.save(output_path)
         
+        # Log the operation
+        log_operation(
+            image_name=filename,
+            operation="grayscale",
+            source_type=source_type,
+            details={
+                "input_path": file_path,
+                "output_path": output_path,
+                "output_filename": output_filename
+            }
+        )
+        
         return output_path
     except Exception as e:
         current_app.logger.error(f"Error processing image: {str(e)}")
+        
+        # Log the error
+        image_name = os.path.basename(file_path)
+        log_operation(
+            image_name=image_name,
+            operation="grayscale",
+            source_type=source_type,
+            status="error",
+            details={"error": str(e)}
+        )
+        
         return None

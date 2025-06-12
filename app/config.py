@@ -5,6 +5,7 @@ class Config:
     UPLOAD_FOLDER = 'uploads'
     ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif'}
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload size
+    LOG_DIR = 'logs'
 
 class DevelopmentConfig(Config):
     """Development config."""
@@ -21,6 +22,7 @@ class TestingConfig(Config):
     DEBUG = True
     TESTING = True
     UPLOAD_FOLDER = 'tests/uploads'
+    LOG_DIR = 'tests/logs'
 
 # Configuration dictionary
 config_by_name = {

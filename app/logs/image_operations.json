@@ -1,0 +1,65 @@
+[
+  {
+    "timestamp": "2025-06-12T14:47:56.365735",
+    "unix_timestamp": 1749719876,
+    "image_name": "url_image_48ef94a9ce2740ba85089f4f19492112.jpg",
+    "operation": "download_for_grayscale",
+    "source_type": "url",
+    "status": "success",
+    "url": "https://cdn.explorecams.com/storage/photos/LEFEikw0MR_1600.jpg",
+    "saved_path": "uploads/url_image_48ef94a9ce2740ba85089f4f19492112.jpg"
+  },
+  {
+    "timestamp": "2025-06-12T14:47:56.392534",
+    "unix_timestamp": 1749719876,
+    "image_name": "url_image_48ef94a9ce2740ba85089f4f19492112.jpg",
+    "operation": "grayscale",
+    "source_type": "url",
+    "status": "success",
+    "input_path": "uploads/url_image_48ef94a9ce2740ba85089f4f19492112.jpg",
+    "output_path": "/Users/harshmaster/Desktop/Work/turing/anthropic/docklens/code/app/static/processed_images/gray_2860b90ab2ae492ab625b65f4a97fa72_url_image_48ef94a9ce2740ba85089f4f19492112.jpg",
+    "output_filename": "gray_2860b90ab2ae492ab625b65f4a97fa72_url_image_48ef94a9ce2740ba85089f4f19492112.jpg"
+  },
+  {
+    "timestamp": "2025-06-12T14:48:19.045960",
+    "unix_timestamp": 1749719899,
+    "image_name": "url_image_08336b12d0e64ec4bf960693f3553f63.jpg",
+    "operation": "download_for_grayscale",
+    "source_type": "url",
+    "status": "success",
+    "url": "https://cdn.explorecams.com/storage/photos/LEFEikw0MR_1600.jpg",
+    "saved_path": "uploads/url_image_08336b12d0e64ec4bf960693f3553f63.jpg"
+  },
+  {
+    "timestamp": "2025-06-12T14:48:19.060230",
+    "unix_timestamp": 1749719899,
+    "image_name": "url_image_08336b12d0e64ec4bf960693f3553f63.jpg",
+    "operation": "grayscale",
+    "source_type": "url",
+    "status": "success",
+    "input_path": "uploads/url_image_08336b12d0e64ec4bf960693f3553f63.jpg",
+    "output_path": "/Users/harshmaster/Desktop/Work/turing/anthropic/docklens/code/app/static/processed_images/gray_e3f2eb0e39b54746b27b7942d78d40c5_url_image_08336b12d0e64ec4bf960693f3553f63.jpg",
+    "output_filename": "gray_e3f2eb0e39b54746b27b7942d78d40c5_url_image_08336b12d0e64ec4bf960693f3553f63.jpg"
+  },
+  {
+    "timestamp": "2025-06-12T14:48:30.330111",
+    "unix_timestamp": 1749719910,
+    "image_name": "url_image_324233f8b3964675b434b3469a8495e2.jpg",
+    "operation": "download_for_grayscale",
+    "source_type": "url",
+    "status": "success",
+    "url": "https://cdn.explorecams.com/storage/photos/LEFEikw0MR_1600.jpg",
+    "saved_path": "uploads/url_image_324233f8b3964675b434b3469a8495e2.jpg"
+  },
+  {
+    "timestamp": "2025-06-12T14:48:30.352200",
+    "unix_timestamp": 1749719910,
+    "image_name": "url_image_324233f8b3964675b434b3469a8495e2.jpg",
+    "operation": "grayscale",
+    "source_type": "url",
+    "status": "success",
+    "input_path": "uploads/url_image_324233f8b3964675b434b3469a8495e2.jpg",
+    "output_path": "/Users/harshmaster/Desktop/Work/turing/anthropic/docklens/code/app/static/processed_images/gray_5dae6d289d1d44538fd6a464e0874cdc_url_image_324233f8b3964675b434b3469a8495e2.jpg",
+    "output_filename": "gray_5dae6d289d1d44538fd6a464e0874cdc_url_image_324233f8b3964675b434b3469a8495e2.jpg"
+  }
+]
