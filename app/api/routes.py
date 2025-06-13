@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, current_app
 from app.api.endpoints.image_endpoints import image_bp
 from flasgger import swag_from
 
@@ -28,7 +28,32 @@ api_bp.register_blueprint(image_bp, url_prefix='/images')
     }
 })
 def health_check():
-    return jsonify({'status': 'OK'}), 200
+    """Health check endpoint for Docker."""
+    try:
+        # Check MongoDB connection
+        db_ping = current_app.db.command('ping')
+        mongodb_status = 'ok' if db_ping.get('ok') == 1.0 else 'error'
+        
+        # Check Redis connection
+        redis_status = 'ok' if current_app.redis.ping() else 'error'
+        
+        if mongodb_status == 'ok' and redis_status == 'ok':
+            return jsonify({
+                'status': 'healthy',
+                'mongodb': mongodb_status,
+                'redis': redis_status
+            }), 200
+        else:
+            return jsonify({
+                'status': 'degraded',
+                'mongodb': mongodb_status,
+                'redis': redis_status
+            }), 500
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e)
+        }), 500
 
 # API index endpoint
 @api_bp.route('/', methods=['GET'])

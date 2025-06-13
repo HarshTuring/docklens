@@ -16,11 +16,19 @@ services:
       - ./static:/app/static
       - ./logs:/app/logs
     depends_on:
-      - mongo
-      - redis
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - app-network
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
   mongo:
     image: mongo:6.0
@@ -34,6 +42,12 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   redis:
     image: redis:7.0-alpine
@@ -45,6 +59,12 @@ services:
     restart: unless-stopped
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   mongodb_data:
