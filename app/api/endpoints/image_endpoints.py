@@ -8,6 +8,7 @@ from app.utils.helpers import (
 from app.utils.logger import log_operation, get_operation_logs
 from app.core.image_processor import process_image, convert_to_grayscale
 from flasgger import swag_from
+from app.services.redis_service import ImageCacheService
 
 image_bp = Blueprint('image', __name__)
 
@@ -359,3 +360,167 @@ def get_logs():
     logs = get_operation_logs(limit=limit, operation_type=operation, source_type=source)
     
     return jsonify(logs), 200
+
+@image_bp.route('/history', methods=['GET'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Get image processing history",
+    "description": "Retrieve history of image uploads and processing from MongoDB",
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return",
+            "required": False,
+            "type": "integer",
+            "default": 10
+        },
+        {
+            "name": "operation",
+            "in": "query",
+            "description": "Filter by operation type (e.g., 'grayscale')",
+            "required": False,
+            "type": "string"
+        },
+        {
+            "name": "source",
+            "in": "query",
+            "description": "Filter by source type (e.g., 'upload', 'url')",
+            "required": False,
+            "type": "string"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "List of image processing history",
+            "schema": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string"},
+                        "upload_date": {"type": "string"},
+                        "source_type": {"type": "string"},
+                        "processed_images": {
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+})
+def get_image_history():
+    """Get image processing history from MongoDB."""
+    # Parse query parameters
+    limit = request.args.get('limit', default=10, type=int)
+    operation = request.args.get('operation', default=None, type=str)
+    source = request.args.get('source', default=None, type=str)
+    
+    # Get history from MongoDB service
+    from app.services.mongodb_service import ImageMetadataService
+    history = ImageMetadataService.get_processing_history(
+        limit=limit, 
+        operation=operation, 
+        source_type=source
+    )
+    
+    # Format dates in the response
+    for record in history:
+        if 'upload_date' in record:
+            record['upload_date'] = record['upload_date'].isoformat()
+        if 'processed_images' in record:
+            for img in record['processed_images']:
+                if 'processed_date' in img:
+                    img['processed_date'] = img['processed_date'].isoformat()
+    
+    return jsonify(history), 200
+
+@image_bp.route('/cache/stats', methods=['GET'])
+@swag_from({
+    "tags": ["Cache Management"],
+    "summary": "Get cache statistics",
+    "description": "View statistics about the Redis image cache",
+    "produces": ["application/json"],
+    "responses": {
+        "200": {
+            "description": "Cache statistics",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "exact_hash_count": {"type": "integer"},
+                    "perceptual_hash_count": {"type": "integer"},
+                    "operations": {"type": "object"},
+                    "memory_usage": {"type": "string"}
+                }
+            }
+        }
+    }
+})
+def get_cache_stats():
+    """Get statistics about the Redis image cache."""
+    redis_client = current_app.redis
+    
+    # Count exact hash keys
+    exact_hash_keys = redis_client.keys(f"{ImageCacheService.EXACT_HASH_PREFIX}*")
+    
+    # Count entries in perceptual hash sorted sets
+    phash_keys = redis_client.keys(f"{ImageCacheService.PHASH_PREFIX}*")
+    phash_counts = {}
+    total_phash_entries = 0
+    
+    for key in phash_keys:
+        key_str = key.decode('utf-8')
+        operation = key_str.replace(ImageCacheService.PHASH_PREFIX, '')
+        count = redis_client.zcard(key)
+        phash_counts[operation] = count
+        total_phash_entries += count
+    
+    # Get Redis memory info
+    info = redis_client.info('memory')
+    
+    return jsonify({
+        "exact_hash_count": len(exact_hash_keys),
+        "perceptual_hash_count": total_phash_entries,
+        "operations": phash_counts,
+        "memory_usage": info.get('used_memory_human', 'unknown'),
+        "peak_memory": info.get('used_memory_peak_human', 'unknown')
+    }), 200
+
+@image_bp.route('/cache/clear', methods=['POST'])
+@swag_from({
+    "tags": ["Cache Management"],
+    "summary": "Clear the image cache",
+    "description": "Remove all cached image processing results from Redis",
+    "produces": ["application/json"],
+    "responses": {
+        "200": {
+            "description": "Cache cleared",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "success": {"type": "boolean"},
+                    "message": {"type": "string"}
+                }
+            }
+        }
+    }
+})
+def clear_cache():
+    """Clear the Redis image cache."""
+    success = ImageCacheService.clear_cache()
+    
+    if success:
+        return jsonify({
+            "success": True,
+            "message": "Image cache cleared successfully"
+        }), 200
+    else:
+        return jsonify({
+            "success": False,
+            "message": "Error clearing cache"
+        }), 500

@@ -2,6 +2,9 @@ from flask import Flask
 import os
 from app.config import get_config
 from flasgger import Swagger
+from pymongo import MongoClient
+import redis
+
 
 def create_app(config_name=None):
     """Application factory function."""
@@ -14,6 +17,13 @@ def create_app(config_name=None):
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(os.path.join(app.static_folder, 'processed_images'), exist_ok=True)
     os.makedirs(os.path.join(app.root_path, app.config['LOG_DIR']), exist_ok=True)
+
+    # Initialize MongoDB
+    mongo_client = MongoClient(app.config['MONGODB_URI'])
+    app.db = mongo_client.get_database()
+    
+    # Initialize Redis
+    app.redis = redis.from_url(app.config['REDIS_URL'])
     
     # Register blueprints
     from app.api.routes import api_bp
