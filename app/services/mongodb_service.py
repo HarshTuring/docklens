@@ -42,7 +42,7 @@ class ImageMetadataService:
         return str(result.inserted_id)
     
     @staticmethod
-    def save_processed_image(original_filename, original_path, processed_path, operation, source_type="upload"):
+    def save_processed_image(original_filename, original_path, processed_path, operation, source_type="upload", params=None):
         """
         Save metadata for a processed image
         
@@ -52,6 +52,7 @@ class ImageMetadataService:
             processed_path: Path to the processed image
             operation: Type of processing operation (e.g., 'grayscale')
             source_type: 'upload' or 'url'
+            params: Optional parameters used for the operation
             
         Returns:
             bool: Success status
@@ -61,14 +62,19 @@ class ImageMetadataService:
         # Find the original image record
         original_image = ImageMetadataService.get_collection().find_one({"file_path": original_path})
         
+        # Create processed info
+        processed_info = {
+            "operation": operation,
+            "processed_path": processed_path,
+            "processed_date": now
+        }
+        
+        # Add parameters if provided
+        if params:
+            processed_info["parameters"] = params
+        
         if original_image:
             # Update existing record with processed image info
-            processed_info = {
-                "operation": operation,
-                "processed_path": processed_path,
-                "processed_date": now
-            }
-            
             result = ImageMetadataService.get_collection().update_one(
                 {"_id": original_image["_id"]},
                 {"$push": {"processed_images": processed_info}}
@@ -82,11 +88,7 @@ class ImageMetadataService:
                 "file_path": original_path,
                 "source_type": source_type,
                 "upload_date": now,
-                "processed_images": [{
-                    "operation": operation,
-                    "processed_path": processed_path,
-                    "processed_date": now
-                }]
+                "processed_images": [processed_info]
             }
             
             result = ImageMetadataService.get_collection().insert_one(document)

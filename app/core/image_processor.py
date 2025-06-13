@@ -566,3 +566,175 @@ def remove_background(file_path, source_type="upload"):
         )
         
         raise Exception(f"Error removing background: {str(e)}")
+    
+def apply_transformations(file_path, transformations, source_type="upload"):
+    """
+    Apply multiple transformations to an image in sequence.
+    
+    Args:
+        file_path: Path to the image to process
+        transformations: Dictionary of transformations to apply
+        source_type: Source of the image (upload, url)
+        
+    Returns:
+        str: Path to the final processed image
+    """
+    try:
+        # Keep track of the current working image path
+        current_path = file_path
+        operations_applied = []
+        
+        # Generate a unique operation key based on all transformations
+        operation_key = "transform_"
+        if transformations.get('remove_background'):
+            operation_key += "bg_"
+        if transformations.get('grayscale'):
+            operation_key += "gray_"
+        if transformations.get('blur', {}).get('apply'):
+            radius = transformations['blur'].get('radius', 2)
+            operation_key += f"blur{radius}_"
+        if transformations.get('rotate', {}).get('apply'):
+            angle = transformations['rotate'].get('angle', 90)
+            operation_key += f"rot{angle}_"
+        if transformations.get('resize', {}).get('apply'):
+            width = transformations['resize'].get('width')
+            height = transformations['resize'].get('height')
+            resize_type = transformations['resize'].get('type', 'maintain_aspect_ratio')
+            operation_key += f"resize{width}x{height}_{resize_type}_"
+            
+        # Add a unique identifier to ensure uniqueness
+        operation_key += uuid.uuid4().hex[:8]
+        
+        # First check if we have a cached version of the complete transformation
+        cached_path = ImageCacheService.find_processed_image(
+            file_path, 
+            operation_key
+        )
+        
+        # If we found a cached version and the file exists
+        if cached_path and os.path.exists(cached_path):
+            # Log cache hit
+            current_app.logger.info(f"Cache hit for combined transformations: {file_path}")
+            
+            # Update MongoDB with processing info (reusing cached version)
+            ImageMetadataService.save_processed_image(
+                original_filename=os.path.basename(file_path),
+                original_path=file_path,
+                processed_path=cached_path,
+                operation="combined_transformations",
+                source_type=source_type,
+                params=transformations
+            )
+            
+            return cached_path
+        
+        # Apply transformations in a specific order for best results
+        
+        # 1. Background Removal (should be first if applied)
+        if transformations.get('remove_background'):
+            current_app.logger.info(f"Applying background removal to {current_path}")
+            processed_path = remove_background(current_path, source_type=source_type)
+            if processed_path:
+                operations_applied.append("background_removal")
+                current_path = processed_path
+                
+        # 2. Resize (should be done early for efficiency)
+        resize_config = transformations.get('resize', {})
+        if resize_config.get('apply'):
+            width = resize_config.get('width')
+            height = resize_config.get('height')
+            resize_type = resize_config.get('type', 'maintain_aspect_ratio')
+            
+            current_app.logger.info(f"Applying resize to {current_path}")
+            processed_path = resize_image(
+                current_path, 
+                width=width, 
+                height=height, 
+                resize_type=resize_type, 
+                source_type=source_type
+            )
+            if processed_path:
+                operations_applied.append("resize")
+                current_path = processed_path
+                
+        # 3. Rotation
+        rotate_config = transformations.get('rotate', {})
+        if rotate_config.get('apply'):
+            angle = rotate_config.get('angle', 90)
+            
+            current_app.logger.info(f"Applying rotation to {current_path}")
+            processed_path = rotate_image(current_path, angle, source_type=source_type)
+            if processed_path:
+                operations_applied.append("rotate")
+                current_path = processed_path
+                
+        # 4. Grayscale
+        if transformations.get('grayscale'):
+            current_app.logger.info(f"Applying grayscale to {current_path}")
+            processed_path = convert_to_grayscale(current_path, source_type=source_type)
+            if processed_path:
+                operations_applied.append("grayscale")
+                current_path = processed_path
+                
+        # 5. Blur (should generally be last)
+        blur_config = transformations.get('blur', {})
+        if blur_config.get('apply'):
+            radius = blur_config.get('radius', 2)
+            
+            current_app.logger.info(f"Applying blur to {current_path}")
+            processed_path = apply_blur(current_path, radius, source_type=source_type)
+            if processed_path:
+                operations_applied.append("blur")
+                current_path = processed_path
+        
+        # Cache the final result with the combined operation key
+        if operations_applied and current_path != file_path:
+            # Save the final result path to the Redis cache
+            ImageCacheService.cache_processed_image(
+                file_path, 
+                current_path, 
+                operation_key
+            )
+            
+            # Log the combined operation
+            log_operation(
+                image_name=os.path.basename(file_path),
+                operation="combined_transformations",
+                source_type=source_type,
+                details={
+                    "input_path": file_path,
+                    "output_path": current_path,
+                    "operations_applied": operations_applied,
+                    "transformations": transformations
+                }
+            )
+            
+            # Save combined processing metadata to MongoDB
+            ImageMetadataService.save_processed_image(
+                original_filename=os.path.basename(file_path),
+                original_path=file_path,
+                processed_path=current_path,
+                operation="combined_transformations",
+                source_type=source_type,
+                params=transformations
+            )
+            
+        return current_path
+        
+    except Exception as e:
+        current_app.logger.error(f"Error applying transformations: {str(e)}")
+        
+        # Log the error
+        image_name = os.path.basename(file_path)
+        log_operation(
+            image_name=image_name,
+            operation="combined_transformations",
+            source_type=source_type,
+            status="error",
+            details={
+                "error": str(e),
+                "transformations": transformations
+            }
+        )
+        
+        raise Exception(f"Error applying transformations: {str(e)}")

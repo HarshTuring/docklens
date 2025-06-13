@@ -6,9 +6,10 @@ from app.utils.helpers import (
     download_image_from_url
 )
 from app.utils.logger import log_operation, get_operation_logs
-from app.core.image_processor import process_image, convert_to_grayscale, apply_blur, rotate_image, resize_image, remove_background
+from app.core.image_processor import process_image, convert_to_grayscale, apply_blur, rotate_image, resize_image, remove_background, apply_transformations
 from flasgger import swag_from
 from app.services.redis_service import ImageCacheService
+import json
 
 image_bp = Blueprint('image', __name__)
 
@@ -1530,4 +1531,362 @@ def remove_background_from_url():
         return jsonify({'error': 'Error processing image'}), 500
     except Exception as e:
         current_app.logger.error(f"Error removing background: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    
+@image_bp.route('/transform', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Apply multiple transformations to an uploaded image",
+    "description": "Upload an image and apply multiple transformations in a single request. Returns the processed image directly.",
+    "consumes": ["multipart/form-data"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "image",
+            "in": "formData",
+            "description": "Image file to process",
+            "required": True,
+            "type": "file"
+        },
+        {
+            "name": "transformations",
+            "in": "formData",
+            "description": "JSON string of transformations to apply",
+            "required": True,
+            "type": "string",
+            "example": '{"grayscale": true, "blur": {"apply": true, "radius": 5}, "rotate": {"apply": true, "angle": 90}, "resize": {"apply": true, "width": 300, "height": 200, "type": "maintain_aspect_ratio"}, "remove_background": false}'
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Transformed image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def transform_image_endpoint():
+    """
+    Apply multiple transformations to an uploaded image in a single request.
+    
+    The transformations are applied in this order:
+    1. Background removal (if applied)
+    2. Resize (if applied)
+    3. Rotate (if applied)
+    4. Grayscale (if applied)
+    5. Blur (if applied)
+    
+    Data flow:
+    1. Upload the image
+    2. Process image with all requested transformations
+    3. Return processed image directly
+    """
+    # Check if request has the file part
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image part in the request'}), 400
+    
+    file = request.files['image']
+    
+    # Check if file is selected
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Get transformations from form
+    try:
+        transformations_json = request.form.get('transformations', '{}')
+        transformations = json.loads(transformations_json)
+        
+        # Validate transformations
+        if not isinstance(transformations, dict):
+            return jsonify({'error': 'Transformations must be a valid JSON object'}), 400
+            
+        # Check if any transformations are requested
+        if not any([
+            transformations.get('grayscale'),
+            transformations.get('blur', {}).get('apply'),
+            transformations.get('rotate', {}).get('apply'),
+            transformations.get('resize', {}).get('apply'),
+            transformations.get('remove_background')
+        ]):
+            return jsonify({'error': 'No transformations specified'}), 400
+            
+    except json.JSONDecodeError:
+        return jsonify({'error': 'Invalid JSON in transformations parameter'}), 400
+    
+    # Save the file if it's allowed
+    filename, file_path = save_uploaded_file(file)
+    
+    if not file_path:
+        # Log failed upload
+        log_operation(
+            image_name=file.filename if file.filename else "unknown",
+            operation="transform",
+            source_type="upload",
+            status="error",
+            details={"error": "File type not allowed"}
+        )
+        return jsonify({'error': 'File type not allowed'}), 400
+    
+    # Log the upload part of the operation
+    log_operation(
+        image_name=filename,
+        operation="upload_for_transform",
+        source_type="upload",
+        details={"original_filename": file.filename, "saved_path": file_path}
+    )
+    
+    # Apply transformations
+    try:
+        processed_path = apply_transformations(
+            file_path, 
+            transformations, 
+            source_type="upload"
+        )
+        
+        if processed_path:
+            # Return the processed image directly
+            image_response = get_image_response(processed_path)
+            if image_response:
+                return image_response
+        
+        return jsonify({'error': 'Error processing image'}), 500
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error applying transformations: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@image_bp.route('/transform-url', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Apply multiple transformations to an image at URL",
+    "description": "Fetch an image from the provided URL and apply multiple transformations in a single request. Returns the processed image directly.",
+    "consumes": ["application/json"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "description": "URL of the image and transformations to apply",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL of the image"
+                    },
+                    "grayscale": {
+                        "type": "boolean",
+                        "description": "Apply grayscale conversion",
+                        "default": False
+                    },
+                    "blur": {
+                        "type": "object",
+                        "description": "Blur transformation options",
+                        "properties": {
+                            "apply": {
+                                "type": "boolean",
+                                "default": False
+                            },
+                            "radius": {
+                                "type": "number",
+                                "default": 2
+                            }
+                        }
+                    },
+                    "rotate": {
+                        "type": "object",
+                        "description": "Rotate transformation options",
+                        "properties": {
+                            "apply": {
+                                "type": "boolean",
+                                "default": False
+                            },
+                            "angle": {
+                                "type": "number",
+                                "default": 90
+                            }
+                        }
+                    },
+                    "resize": {
+                        "type": "object",
+                        "description": "Resize transformation options",
+                        "properties": {
+                            "apply": {
+                                "type": "boolean",
+                                "default": False
+                            },
+                            "width": {
+                                "type": "integer"
+                            },
+                            "height": {
+                                "type": "integer"
+                            },
+                            "type": {
+                                "type": "string",
+                                "enum": ["free", "maintain_aspect_ratio"],
+                                "default": "maintain_aspect_ratio"
+                            }
+                        }
+                    },
+                    "remove_background": {
+                        "type": "boolean",
+                        "description": "Apply background removal",
+                        "default": False
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Transformed image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request or invalid URL",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def transform_image_from_url():
+    """
+    Apply multiple transformations to an image from URL in a single request.
+    
+    The transformations are applied in this order:
+    1. Background removal (if applied)
+    2. Resize (if applied)
+    3. Rotate (if applied)
+    4. Grayscale (if applied)
+    5. Blur (if applied)
+    
+    Data flow:
+    1. Download image from URL
+    2. Process image with all requested transformations
+    3. Return processed image directly
+    
+    Expected JSON payload:
+    {
+        "url": "https://example.com/image.jpg",
+        "grayscale": true,
+        "blur": { "apply": true, "radius": 5 },
+        "rotate": { "apply": true, "angle": 90 },
+        "resize": { "apply": true, "width": 300, "height": 200, "type": "maintain_aspect_ratio" },
+        "remove_background": false
+    }
+    """
+    # Get request data
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({'error': 'No URL provided'}), 400
+    
+    image_url = data['url']
+    
+    # Extract transformations
+    transformations = {
+        'grayscale': data.get('grayscale', False),
+        'blur': data.get('blur', {}),
+        'rotate': data.get('rotate', {}),
+        'resize': data.get('resize', {}),
+        'remove_background': data.get('remove_background', False)
+    }
+    
+    # Check if any transformations are requested
+    if not any([
+        transformations.get('grayscale'),
+        transformations.get('blur', {}).get('apply'),
+        transformations.get('rotate', {}).get('apply'),
+        transformations.get('resize', {}).get('apply'),
+        transformations.get('remove_background')
+    ]):
+        return jsonify({'error': 'No transformations specified'}), 400
+        
+    # Validate URL
+    if not is_valid_image_url(image_url):
+        # Log invalid URL
+        log_operation(
+            image_name="unknown",
+            operation="transform",
+            source_type="url",
+            status="error",
+            details={"error": "Invalid image URL", "url": image_url}
+        )
+        return jsonify({'error': 'Invalid image URL'}), 400
+    
+    # Download image from URL
+    filename, file_path = download_image_from_url(image_url)
+    
+    if not file_path:
+        # Log download failure
+        log_operation(
+            image_name="unknown",
+            operation="transform",
+            source_type="url",
+            status="error",
+            details={"error": "Could not download image from URL", "url": image_url}
+        )
+        return jsonify({'error': 'Could not download image from URL'}), 400
+    
+    # Log the download part of the operation
+    log_operation(
+        image_name=filename,
+        operation="download_for_transform",
+        source_type="url",
+        details={"url": image_url, "saved_path": file_path}
+    )
+    
+    # Apply transformations
+    try:
+        processed_path = apply_transformations(
+            file_path, 
+            transformations, 
+            source_type="url"
+        )
+        
+        if processed_path:
+            # Return the processed image directly
+            image_response = get_image_response(processed_path)
+            if image_response:
+                return image_response
+        
+        return jsonify({'error': 'Error processing image'}), 500
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error applying transformations: {str(e)}")
         return jsonify({'error': str(e)}), 500
