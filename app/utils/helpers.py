@@ -6,6 +6,7 @@ import re
 from werkzeug.utils import secure_filename
 from flask import current_app, send_file
 from PIL import Image
+from app.services.mongodb_service import ImageMetadataService
 
 def allowed_file(filename):
     """Check if the file extension is allowed."""
@@ -23,6 +24,13 @@ def save_uploaded_file(file):
         
         file_path = os.path.join(upload_folder, unique_filename)
         file.save(file_path)
+
+        ImageMetadataService.save_upload_metadata(
+            filename=unique_filename,
+            file_path=file_path,
+            original_filename=file.filename,
+            source_type="upload"
+        )
         
         return unique_filename, file_path
     
@@ -89,6 +97,16 @@ def download_image_from_url(url):
     Returns:
         tuple: (filename, file_path) or (None, None) if download fails
     """
+
+    already_processed, existing_record = ImageMetadataService.is_url_processed(url)
+
+    if already_processed:
+        # If the image was already downloaded before, check if file still exists
+        file_path = existing_record.get('processed_images')[0].get('file_path')
+        if file_path and os.path.exists(file_path):
+            # Return the existing file
+            return existing_record.get('filename'), file_path
+
     try:
         # Download the image
         response = requests.get(url, timeout=10)
@@ -116,6 +134,14 @@ def download_image_from_url(url):
         # Save the image
         with open(file_path, 'wb') as f:
             f.write(response.content)
+
+        ImageMetadataService.save_upload_metadata(
+            filename=filename,
+            file_path=file_path,
+            original_filename=filename,
+            source_type="url",
+            source_url=url
+        )
         
         return filename, file_path
     except requests.RequestException as e:

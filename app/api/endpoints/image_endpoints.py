@@ -359,3 +359,82 @@ def get_logs():
     logs = get_operation_logs(limit=limit, operation_type=operation, source_type=source)
     
     return jsonify(logs), 200
+
+@image_bp.route('/history', methods=['GET'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Get image processing history",
+    "description": "Retrieve history of image uploads and processing from MongoDB",
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of records to return",
+            "required": False,
+            "type": "integer",
+            "default": 10
+        },
+        {
+            "name": "operation",
+            "in": "query",
+            "description": "Filter by operation type (e.g., 'grayscale')",
+            "required": False,
+            "type": "string"
+        },
+        {
+            "name": "source",
+            "in": "query",
+            "description": "Filter by source type (e.g., 'upload', 'url')",
+            "required": False,
+            "type": "string"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "List of image processing history",
+            "schema": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "filename": {"type": "string"},
+                        "upload_date": {"type": "string"},
+                        "source_type": {"type": "string"},
+                        "processed_images": {
+                            "type": "array",
+                            "items": {
+                                "type": "object"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+})
+def get_image_history():
+    """Get image processing history from MongoDB."""
+    # Parse query parameters
+    limit = request.args.get('limit', default=10, type=int)
+    operation = request.args.get('operation', default=None, type=str)
+    source = request.args.get('source', default=None, type=str)
+    
+    # Get history from MongoDB service
+    from app.services.mongodb_service import ImageMetadataService
+    history = ImageMetadataService.get_processing_history(
+        limit=limit, 
+        operation=operation, 
+        source_type=source
+    )
+    
+    # Format dates in the response
+    for record in history:
+        if 'upload_date' in record:
+            record['upload_date'] = record['upload_date'].isoformat()
+        if 'processed_images' in record:
+            for img in record['processed_images']:
+                if 'processed_date' in img:
+                    img['processed_date'] = img['processed_date'].isoformat()
+    
+    return jsonify(history), 200

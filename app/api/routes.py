@@ -98,7 +98,8 @@ def api_index():
                 'upload': '/api/images/upload',
                 'grayscale': '/api/images/grayscale',
                 'grayscale_url': '/api/images/grayscale-url',
-                'logs': '/api/images/logs'
+                'logs': '/api/images/logs',
+                'history': '/api/images/history'
             }
         }
     }), 200

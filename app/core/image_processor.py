@@ -3,6 +3,7 @@ import os
 import uuid
 from flask import current_app
 from app.utils.logger import log_operation
+from app.services.mongodb_service import ImageMetadataService
 
 def process_image(file_path):
     """
@@ -70,6 +71,14 @@ def convert_to_grayscale(file_path, source_type="upload"):
                 "output_path": output_path,
                 "output_filename": output_filename
             }
+        )
+
+        ImageMetadataService.save_processed_image(
+            original_filename=filename,
+            original_path=file_path,
+            processed_path=output_path,
+            operation="grayscale",
+            source_type=source_type
         )
         
         return output_path

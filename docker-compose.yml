@@ -13,8 +13,8 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
     volumes:
       - ./uploads:/app/uploads
-      - ./static:/app/static
-      - ./logs:/app/logs
+      - ./app/static:/app/app/static
+      - ./app/logs:/app/app/logs
     depends_on:
       mongo:
         condition: service_healthy
@@ -24,7 +24,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:5000/health" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:5001/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
