@@ -4,6 +4,7 @@ import uuid
 from flask import current_app
 from app.utils.logger import log_operation
 from app.services.mongodb_service import ImageMetadataService
+from app.services.redis_service import ImageCacheService
 
 def process_image(file_path):
     """
@@ -43,6 +44,25 @@ def convert_to_grayscale(file_path, source_type="upload"):
         str: Path to the processed image
     """
     try:
+        # First check if we have a cached version
+        cached_path = ImageCacheService.find_processed_image(file_path, "grayscale")
+        
+        # If we found a cached version and the file exists
+        if cached_path and os.path.exists(cached_path):
+            # Log cache hit
+            current_app.logger.info(f"Cache hit for grayscale processing: {file_path}")
+            
+            # Update MongoDB with processing info (reusing cached version)
+            ImageMetadataService.save_processed_image(
+                original_filename=os.path.basename(file_path),
+                original_path=file_path,
+                processed_path=cached_path,
+                operation="grayscale",
+                source_type=source_type
+            )
+            
+            return cached_path
+
         # Open the image
         img = Image.open(file_path)
         
@@ -72,6 +92,8 @@ def convert_to_grayscale(file_path, source_type="upload"):
                 "output_filename": output_filename
             }
         )
+
+        ImageCacheService.cache_processed_image(file_path, output_path, "grayscale")
 
         ImageMetadataService.save_processed_image(
             original_filename=filename,

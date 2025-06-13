@@ -99,7 +99,11 @@ def api_index():
                 'grayscale': '/api/images/grayscale',
                 'grayscale_url': '/api/images/grayscale-url',
                 'logs': '/api/images/logs',
-                'history': '/api/images/history'
+                'history': '/api/images/history',
+                'cache': {
+                    'stats': '/api/images/cache/stats',
+                    'clear': '/api/images/cache/clear'
+                }
             }
         }
     }), 200
