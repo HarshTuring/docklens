@@ -6,7 +6,7 @@ from app.utils.helpers import (
     download_image_from_url
 )
 from app.utils.logger import log_operation, get_operation_logs
-from app.core.image_processor import process_image, convert_to_grayscale, apply_blur, rotate_image
+from app.core.image_processor import process_image, convert_to_grayscale, apply_blur, rotate_image, resize_image
 from flasgger import swag_from
 from app.services.redis_service import ImageCacheService
 
@@ -1001,5 +1001,310 @@ def rotate_image_from_url():
         image_response = get_image_response(processed_path)
         if image_response:
             return image_response
+    
+    return jsonify({'error': 'Error processing image'}), 500
+
+@image_bp.route('/resize', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Resize an uploaded image",
+    "description": "Upload an image and resize it according to specified parameters. Returns the processed image directly.",
+    "consumes": ["multipart/form-data"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "image",
+            "in": "formData",
+            "description": "Image file to process",
+            "required": True,
+            "type": "file"
+        },
+        {
+            "name": "width",
+            "in": "formData",
+            "description": "Target width in pixels",
+            "required": False,
+            "type": "integer"
+        },
+        {
+            "name": "height",
+            "in": "formData",
+            "description": "Target height in pixels",
+            "required": False,
+            "type": "integer"
+        },
+        {
+            "name": "type",
+            "in": "formData",
+            "description": "Resize type: 'free' or 'maintain_aspect_ratio'",
+            "required": False,
+            "type": "string",
+            "enum": ["free", "maintain_aspect_ratio"],
+            "default": "maintain_aspect_ratio"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Resized image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def resize_image_endpoint():
+    """
+    Resize an uploaded image and return the processed image.
+    
+    Data flow:
+    1. Upload the image
+    2. Process image (resize according to parameters)
+    3. Return processed image directly
+    """
+    # Check if request has the file part
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image part in the request'}), 400
+    
+    file = request.files['image']
+    
+    # Check if file is selected
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Get resize parameters from form
+    width = request.form.get('width', None)
+    height = request.form.get('height', None)
+    resize_type = request.form.get('type', 'maintain_aspect_ratio')
+    
+    # Validate and convert parameters
+    try:
+        width = int(width) if width else None
+        height = int(height) if height else None
+        
+        if width is None and height is None:
+            return jsonify({'error': 'At least one dimension (width or height) must be specified'}), 400
+            
+        if resize_type not in ["free", "maintain_aspect_ratio"]:
+            return jsonify({'error': 'Resize type must be "free" or "maintain_aspect_ratio"'}), 400
+    except ValueError:
+        return jsonify({'error': 'Width and height must be integers'}), 400
+    
+    # Save the file if it's allowed
+    filename, file_path = save_uploaded_file(file)
+    
+    if not file_path:
+        # Log failed upload
+        log_operation(
+            image_name=file.filename if file.filename else "unknown",
+            operation="resize",
+            source_type="upload",
+            status="error",
+            details={"error": "File type not allowed"}
+        )
+        return jsonify({'error': 'File type not allowed'}), 400
+    
+    # Log the upload part of the operation
+    log_operation(
+        image_name=filename,
+        operation="upload_for_resize",
+        source_type="upload",
+        details={"original_filename": file.filename, "saved_path": file_path}
+    )
+    
+    # Apply resize
+    try:
+        processed_path = resize_image(
+            file_path, 
+            width=width, 
+            height=height, 
+            resize_type=resize_type, 
+            source_type="upload"
+        )
+        
+        if processed_path:
+            # Return the processed image directly
+            image_response = get_image_response(processed_path)
+            if image_response:
+                return image_response
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error processing image: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    
+    return jsonify({'error': 'Error processing image'}), 500
+
+@image_bp.route('/resize-url', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Resize an image from URL",
+    "description": "Fetch an image from the provided URL and resize it. Returns the processed image directly.",
+    "consumes": ["application/json"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "description": "URL of the image and resize parameters",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL of the image"
+                    },
+                    "width": {
+                        "type": "integer",
+                        "description": "Target width in pixels"
+                    },
+                    "height": {
+                        "type": "integer",
+                        "description": "Target height in pixels"
+                    },
+                    "type": {
+                        "type": "string",
+                        "description": "Resize type: 'free' or 'maintain_aspect_ratio'",
+                        "enum": ["free", "maintain_aspect_ratio"],
+                        "default": "maintain_aspect_ratio"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Resized image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request or invalid URL",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def resize_image_from_url():
+    """
+    Resize an image from URL and return the processed image.
+    
+    Data flow:
+    1. Download image from URL
+    2. Process image (resize according to parameters)
+    3. Return processed image directly
+    
+    Expected JSON payload:
+    {
+        "url": "https://example.com/image.jpg",
+        "width": 800,
+        "height": 600,
+        "type": "maintain_aspect_ratio"
+    }
+    """
+    # Get URL from request
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({'error': 'No URL provided'}), 400
+    
+    image_url = data['url']
+    
+    # Get resize parameters
+    width = data.get('width', None)
+    height = data.get('height', None)
+    resize_type = data.get('type', 'maintain_aspect_ratio')
+    
+    # Validate parameters
+    if width is None and height is None:
+        return jsonify({'error': 'At least one dimension (width or height) must be specified'}), 400
+        
+    if resize_type not in ["free", "maintain_aspect_ratio"]:
+        return jsonify({'error': 'Resize type must be "free" or "maintain_aspect_ratio"'}), 400
+        
+    # Validate URL
+    if not is_valid_image_url(image_url):
+        # Log invalid URL
+        log_operation(
+            image_name="unknown",
+            operation="resize",
+            source_type="url",
+            status="error",
+            details={"error": "Invalid image URL", "url": image_url}
+        )
+        return jsonify({'error': 'Invalid image URL'}), 400
+    
+    # Download image from URL
+    filename, file_path = download_image_from_url(image_url)
+    
+    if not file_path:
+        # Log download failure
+        log_operation(
+            image_name="unknown",
+            operation="resize",
+            source_type="url",
+            status="error",
+            details={"error": "Could not download image from URL", "url": image_url}
+        )
+        return jsonify({'error': 'Could not download image from URL'}), 400
+    
+    # Log the download part of the operation
+    log_operation(
+        image_name=filename,
+        operation="download_for_resize",
+        source_type="url",
+        details={"url": image_url, "saved_path": file_path}
+    )
+    
+    # Apply resize
+    try:
+        processed_path = resize_image(
+            file_path, 
+            width=width, 
+            height=height, 
+            resize_type=resize_type, 
+            source_type="url"
+        )
+        
+        if processed_path:
+            # Return the processed image directly
+            image_response = get_image_response(processed_path)
+            if image_response:
+                return image_response
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        current_app.logger.error(f"Error processing image: {str(e)}")
+        return jsonify({'error': str(e)}), 500
     
     return jsonify({'error': 'Error processing image'}), 500

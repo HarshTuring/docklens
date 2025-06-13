@@ -102,6 +102,8 @@ def api_index():
                 'blur_url': '/api/images/blur-url',
                 'rotate': '/api/images/rotate',
                 'rotate_url': '/api/images/rotate-url',
+                'resize': '/api/images/resize',
+                'resize_url': '/api/images/resize-url',
                 'logs': '/api/images/logs',
                 'history': '/api/images/history',
                 'cache': {
