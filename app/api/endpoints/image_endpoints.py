@@ -6,7 +6,7 @@ from app.utils.helpers import (
     download_image_from_url
 )
 from app.utils.logger import log_operation, get_operation_logs
-from app.core.image_processor import process_image, convert_to_grayscale, apply_blur
+from app.core.image_processor import process_image, convert_to_grayscale, apply_blur, rotate_image
 from flasgger import swag_from
 from app.services.redis_service import ImageCacheService
 
@@ -758,6 +758,243 @@ def blur_image_from_url():
     
     # Apply blur
     processed_path = apply_blur(file_path, radius, source_type="url")
+    
+    if processed_path:
+        # Return the processed image directly
+        image_response = get_image_response(processed_path)
+        if image_response:
+            return image_response
+    
+    return jsonify({'error': 'Error processing image'}), 500
+
+@image_bp.route('/rotate', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Rotate an uploaded image",
+    "description": "Upload an image and rotate it by the specified angle. Returns the processed image directly.",
+    "consumes": ["multipart/form-data"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "image",
+            "in": "formData",
+            "description": "Image file to process",
+            "required": True,
+            "type": "file"
+        },
+        {
+            "name": "angle",
+            "in": "formData",
+            "description": "Rotation angle in degrees (clockwise)",
+            "required": False,
+            "type": "number",
+            "default": 90
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Rotated image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def rotate_image_endpoint():
+    """
+    Rotate an uploaded image and return the processed image.
+    
+    Data flow:
+    1. Upload the image
+    2. Process image (apply rotation)
+    3. Return processed image directly
+    """
+    # Check if request has the file part
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image part in the request'}), 400
+    
+    file = request.files['image']
+    
+    # Check if file is selected
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+    
+    # Get rotation angle from form
+    try:
+        angle = float(request.form.get('angle', 90))
+    except ValueError:
+        return jsonify({'error': 'Invalid rotation angle'}), 400
+    
+    # Save the file if it's allowed
+    filename, file_path = save_uploaded_file(file)
+    
+    if not file_path:
+        # Log failed upload
+        log_operation(
+            image_name=file.filename if file.filename else "unknown",
+            operation=f"rotate_{angle}",
+            source_type="upload",
+            status="error",
+            details={"error": "File type not allowed"}
+        )
+        return jsonify({'error': 'File type not allowed'}), 400
+    
+    # Log the upload part of the operation
+    log_operation(
+        image_name=filename,
+        operation="upload_for_rotate",
+        source_type="upload",
+        details={"original_filename": file.filename, "saved_path": file_path}
+    )
+    
+    # Apply rotation
+    processed_path = rotate_image(file_path, angle, source_type="upload")
+    
+    if processed_path:
+        # Return the processed image directly
+        image_response = get_image_response(processed_path)
+        if image_response:
+            return image_response
+    
+    return jsonify({'error': 'Error processing image'}), 500
+
+@image_bp.route('/rotate-url', methods=['POST'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Rotate an image from URL",
+    "description": "Fetch an image from the provided URL and rotate it. Returns the processed image directly.",
+    "consumes": ["application/json"],
+    "produces": ["image/*"],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "description": "URL of the image and rotation parameters",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["url"],
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL of the image"
+                    },
+                    "angle": {
+                        "type": "number",
+                        "description": "Rotation angle in degrees (clockwise)",
+                        "default": 90
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Rotated image",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request or invalid URL",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "500": {
+            "description": "Processing error",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def rotate_image_from_url():
+    """
+    Rotate an image from URL and return the processed image.
+    
+    Data flow:
+    1. Download image from URL
+    2. Process image (apply rotation)
+    3. Return processed image directly
+    
+    Expected JSON payload:
+    {
+        "url": "https://example.com/image.jpg",
+        "angle": 90
+    }
+    """
+    # Get URL from request
+    data = request.get_json()
+    if not data or 'url' not in data:
+        return jsonify({'error': 'No URL provided'}), 400
+    
+    image_url = data['url']
+    
+    # Get rotation angle
+    try:
+        angle = float(data.get('angle', 90))
+    except ValueError:
+        return jsonify({'error': 'Invalid rotation angle'}), 400
+    
+    # Validate URL
+    if not is_valid_image_url(image_url):
+        # Log invalid URL
+        log_operation(
+            image_name="unknown",
+            operation=f"rotate_{angle}",
+            source_type="url",
+            status="error",
+            details={"error": "Invalid image URL", "url": image_url}
+        )
+        return jsonify({'error': 'Invalid image URL'}), 400
+    
+    # Download image from URL
+    filename, file_path = download_image_from_url(image_url)
+    
+    if not file_path:
+        # Log download failure
+        log_operation(
+            image_name="unknown",
+            operation=f"rotate_{angle}",
+            source_type="url",
+            status="error",
+            details={"error": "Could not download image from URL", "url": image_url}
+        )
+        return jsonify({'error': 'Could not download image from URL'}), 400
+    
+    # Log the download part of the operation
+    log_operation(
+        image_name=filename,
+        operation="download_for_rotate",
+        source_type="url",
+        details={"url": image_url, "saved_path": file_path}
+    )
+    
+    # Apply rotation
+    processed_path = rotate_image(file_path, angle, source_type="url")
     
     if processed_path:
         # Return the processed image directly

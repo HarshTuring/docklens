@@ -98,6 +98,10 @@ def api_index():
                 'upload': '/api/images/upload',
                 'grayscale': '/api/images/grayscale',
                 'grayscale_url': '/api/images/grayscale-url',
+                'blur': '/api/images/blur',
+                'blur_url': '/api/images/blur-url',
+                'rotate': '/api/images/rotate',
+                'rotate_url': '/api/images/rotate-url',
                 'logs': '/api/images/logs',
                 'history': '/api/images/history',
                 'cache': {
