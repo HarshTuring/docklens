@@ -15,6 +15,7 @@ services:
       - ./uploads:/app/uploads
       - ./app/static:/app/app/static
       - ./app/logs:/app/app/logs
+      - ~/.u2net:/home/appuser/.u2net
     depends_on:
       mongo:
         condition: service_healthy

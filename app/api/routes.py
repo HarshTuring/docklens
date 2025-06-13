@@ -104,6 +104,8 @@ def api_index():
                 'rotate_url': '/api/images/rotate-url',
                 'resize': '/api/images/resize',
                 'resize_url': '/api/images/resize-url',
+                'remove_background': '/api/images/remove-background',
+                'remove_background_url': '/api/images/remove-background-url',
                 'logs': '/api/images/logs',
                 'history': '/api/images/history',
                 'cache': {
