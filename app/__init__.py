@@ -3,6 +3,8 @@ import os
 from app.config import get_config
 from flasgger import Swagger
 from pymongo import MongoClient
+import redis
+
 
 def create_app(config_name=None):
     """Application factory function."""
@@ -19,6 +21,9 @@ def create_app(config_name=None):
     # Initialize MongoDB
     mongo_client = MongoClient(app.config['MONGODB_URI'])
     app.db = mongo_client.get_database()
+    
+    # Initialize Redis
+    app.redis = redis.from_url(app.config['REDIS_URL'])
     
     # Register blueprints
     from app.api.routes import api_bp

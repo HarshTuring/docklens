@@ -7,6 +7,8 @@ class Config:
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max upload size
     LOG_DIR = 'logs'
     MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/image_processing')
+    REDIS_URL = os.environ.get('REDIS_URL', 'redis://:redis_password@localhost:6379/0')
+
 
 class DevelopmentConfig(Config):
     """Development config."""

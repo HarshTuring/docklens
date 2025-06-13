@@ -6,3 +6,4 @@ gunicorn
 requests
 flasgger
 pymongo==4.5.0
+redis==5.0.0
