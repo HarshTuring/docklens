@@ -43,7 +43,7 @@ services:
     container_name: image-processor-auth
     restart: unless-stopped  # Restart on failure, except when manually stopped
     ports:
-      - "5001:5001"
+      - "5002:5001"
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=prod
@@ -54,7 +54,7 @@ services:
     volumes:
       - ./auth-service:/app
     depends_on:
-      mongodb:
+      mongo:
         condition: service_healthy
     networks:
       - app-network
