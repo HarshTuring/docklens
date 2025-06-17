@@ -52,13 +52,32 @@ def convert_to_grayscale(file_path, source_type="upload"):
             # Log cache hit
             current_app.logger.info(f"Cache hit for grayscale processing: {file_path}")
             
-            # Update MongoDB with processing info (reusing cached version)
-            ImageMetadataService.save_processed_image(
-                original_filename=os.path.basename(file_path),
-                original_path=file_path,
+            # Get or create original image record
+            original_image = ImageMetadataService.get_original_image_by_path(file_path)
+            if not original_image:
+                original_image_id = ImageMetadataService.save_original_image(
+                    filename=os.path.basename(file_path),
+                    file_path=file_path,
+                    original_filename=os.path.basename(file_path),
+                    source_type=source_type
+                )
+            else:
+                original_image_id = original_image['_id']
+            
+            # Create version record
+            version_number = ImageMetadataService.get_next_version_number(original_image_id)
+            ImageMetadataService.create_image_version(
+                original_image_id=original_image_id,
                 processed_path=cached_path,
-                operation="grayscale",
-                source_type=source_type
+                operation_params={"grayscale": True}
+            )
+            
+            # Cache the version
+            ImageCacheService.cache_image_version(
+                original_image_id=original_image_id,
+                version_number=version_number,
+                processed_path=cached_path,
+                operation_params={"grayscale": True}
             )
             
             return cached_path
@@ -81,6 +100,34 @@ def convert_to_grayscale(file_path, source_type="upload"):
         # Save the grayscale image
         gray_img.save(output_path)
         
+        # Get or create original image record
+        original_image = ImageMetadataService.get_original_image_by_path(file_path)
+        if not original_image:
+            original_image_id = ImageMetadataService.save_original_image(
+                filename=filename,
+                file_path=file_path,
+                original_filename=filename,
+                source_type=source_type
+            )
+        else:
+            original_image_id = original_image['_id']
+        
+        # Create version record
+        version_number = ImageMetadataService.get_next_version_number(original_image_id)
+        ImageMetadataService.create_image_version(
+            original_image_id=original_image_id,
+            processed_path=output_path,
+            operation_params={"grayscale": True}
+        )
+        
+        # Cache the version
+        ImageCacheService.cache_image_version(
+            original_image_id=original_image_id,
+            version_number=version_number,
+            processed_path=output_path,
+            operation_params={"grayscale": True}
+        )
+        
         # Log the operation
         log_operation(
             image_name=filename,
@@ -89,18 +136,10 @@ def convert_to_grayscale(file_path, source_type="upload"):
             details={
                 "input_path": file_path,
                 "output_path": output_path,
-                "output_filename": output_filename
+                "output_filename": output_filename,
+                "original_image_id": str(original_image_id),
+                "version_number": version_number
             }
-        )
-
-        ImageCacheService.cache_processed_image(file_path, output_path, "grayscale")
-
-        ImageMetadataService.save_processed_image(
-            original_filename=filename,
-            original_path=file_path,
-            processed_path=output_path,
-            operation="grayscale",
-            source_type=source_type
         )
         
         return output_path
@@ -118,7 +157,7 @@ def convert_to_grayscale(file_path, source_type="upload"):
         )
         
         return None
-    
+
 def apply_blur(file_path, radius=2.0, source_type="upload"):
     """
     Apply a Gaussian blur filter to an image.
@@ -143,13 +182,32 @@ def apply_blur(file_path, radius=2.0, source_type="upload"):
             # Log cache hit
             current_app.logger.info(f"Cache hit for blur processing: {file_path}")
             
-            # Update MongoDB with processing info (reusing cached version)
-            ImageMetadataService.save_processed_image(
-                original_filename=os.path.basename(file_path),
-                original_path=file_path,
+            # Get or create original image record
+            original_image = ImageMetadataService.get_original_image_by_path(file_path)
+            if not original_image:
+                original_image_id = ImageMetadataService.save_original_image(
+                    filename=os.path.basename(file_path),
+                    file_path=file_path,
+                    original_filename=os.path.basename(file_path),
+                    source_type=source_type
+                )
+            else:
+                original_image_id = original_image['_id']
+            
+            # Create version record
+            version_number = ImageMetadataService.get_next_version_number(original_image_id)
+            ImageMetadataService.create_image_version(
+                original_image_id=original_image_id,
                 processed_path=cached_path,
-                operation=f"blur_{radius}",
-                source_type=source_type
+                operation_params={"blur": {"apply": True, "radius": radius}}
+            )
+            
+            # Cache the version
+            ImageCacheService.cache_image_version(
+                original_image_id=original_image_id,
+                version_number=version_number,
+                processed_path=cached_path,
+                operation_params={"blur": {"apply": True, "radius": radius}}
             )
             
             return cached_path
@@ -173,6 +231,34 @@ def apply_blur(file_path, radius=2.0, source_type="upload"):
         # Save the blurred image
         blurred_img.save(output_path)
         
+        # Get or create original image record
+        original_image = ImageMetadataService.get_original_image_by_path(file_path)
+        if not original_image:
+            original_image_id = ImageMetadataService.save_original_image(
+                filename=filename,
+                file_path=file_path,
+                original_filename=filename,
+                source_type=source_type
+            )
+        else:
+            original_image_id = original_image['_id']
+        
+        # Create version record
+        version_number = ImageMetadataService.get_next_version_number(original_image_id)
+        ImageMetadataService.create_image_version(
+            original_image_id=original_image_id,
+            processed_path=output_path,
+            operation_params={"blur": {"apply": True, "radius": radius}}
+        )
+        
+        # Cache the version
+        ImageCacheService.cache_image_version(
+            original_image_id=original_image_id,
+            version_number=version_number,
+            processed_path=output_path,
+            operation_params={"blur": {"apply": True, "radius": radius}}
+        )
+        
         # Log the operation
         log_operation(
             image_name=filename,
@@ -182,24 +268,10 @@ def apply_blur(file_path, radius=2.0, source_type="upload"):
                 "input_path": file_path,
                 "output_path": output_path,
                 "output_filename": output_filename,
-                "radius": radius
+                "radius": radius,
+                "original_image_id": str(original_image_id),
+                "version_number": version_number
             }
-        )
-
-        # Cache the processed image
-        ImageCacheService.cache_processed_image(
-            file_path, 
-            output_path, 
-            f"blur_{radius}"
-        )
-
-        # Save processing metadata to MongoDB
-        ImageMetadataService.save_processed_image(
-            original_filename=filename,
-            original_path=file_path,
-            processed_path=output_path,
-            operation=f"blur_{radius}",
-            source_type=source_type
         )
         
         return output_path
@@ -242,13 +314,32 @@ def rotate_image(file_path, angle=0, source_type="upload"):
             # Log cache hit
             current_app.logger.info(f"Cache hit for rotate processing: {file_path}")
             
-            # Update MongoDB with processing info (reusing cached version)
-            ImageMetadataService.save_processed_image(
-                original_filename=os.path.basename(file_path),
-                original_path=file_path,
+            # Get or create original image record
+            original_image = ImageMetadataService.get_original_image_by_path(file_path)
+            if not original_image:
+                original_image_id = ImageMetadataService.save_original_image(
+                    filename=os.path.basename(file_path),
+                    file_path=file_path,
+                    original_filename=os.path.basename(file_path),
+                    source_type=source_type
+                )
+            else:
+                original_image_id = original_image['_id']
+            
+            # Create version record
+            version_number = ImageMetadataService.get_next_version_number(original_image_id)
+            ImageMetadataService.create_image_version(
+                original_image_id=original_image_id,
                 processed_path=cached_path,
-                operation=f"rotate_{angle}",
-                source_type=source_type
+                operation_params={"rotate": {"apply": True, "angle": angle}}
+            )
+            
+            # Cache the version
+            ImageCacheService.cache_image_version(
+                original_image_id=original_image_id,
+                version_number=version_number,
+                processed_path=cached_path,
+                operation_params={"rotate": {"apply": True, "angle": angle}}
             )
             
             return cached_path
@@ -271,6 +362,34 @@ def rotate_image(file_path, angle=0, source_type="upload"):
         # Save the rotated image
         rotated_img.save(output_path)
         
+        # Get or create original image record
+        original_image = ImageMetadataService.get_original_image_by_path(file_path)
+        if not original_image:
+            original_image_id = ImageMetadataService.save_original_image(
+                filename=filename,
+                file_path=file_path,
+                original_filename=filename,
+                source_type=source_type
+            )
+        else:
+            original_image_id = original_image['_id']
+        
+        # Create version record
+        version_number = ImageMetadataService.get_next_version_number(original_image_id)
+        ImageMetadataService.create_image_version(
+            original_image_id=original_image_id,
+            processed_path=output_path,
+            operation_params={"rotate": {"apply": True, "angle": angle}}
+        )
+        
+        # Cache the version
+        ImageCacheService.cache_image_version(
+            original_image_id=original_image_id,
+            version_number=version_number,
+            processed_path=output_path,
+            operation_params={"rotate": {"apply": True, "angle": angle}}
+        )
+        
         # Log the operation
         log_operation(
             image_name=filename,
@@ -280,24 +399,10 @@ def rotate_image(file_path, angle=0, source_type="upload"):
                 "input_path": file_path,
                 "output_path": output_path,
                 "output_filename": output_filename,
-                "angle": angle
+                "angle": angle,
+                "original_image_id": str(original_image_id),
+                "version_number": version_number
             }
-        )
-
-        # Cache the processed image
-        ImageCacheService.cache_processed_image(
-            file_path, 
-            output_path, 
-            f"rotate_{angle}"
-        )
-
-        # Save processing metadata to MongoDB
-        ImageMetadataService.save_processed_image(
-            original_filename=filename,
-            original_path=file_path,
-            processed_path=output_path,
-            operation=f"rotate_{angle}",
-            source_type=source_type
         )
         
         return output_path
@@ -362,13 +467,46 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
             # Log cache hit
             current_app.logger.info(f"Cache hit for resize processing: {file_path}")
             
-            # Update MongoDB with processing info (reusing cached version)
-            ImageMetadataService.save_processed_image(
-                original_filename=os.path.basename(file_path),
-                original_path=file_path,
+            # Get or create original image record
+            original_image = ImageMetadataService.get_original_image_by_path(file_path)
+            if not original_image:
+                original_image_id = ImageMetadataService.save_original_image(
+                    filename=os.path.basename(file_path),
+                    file_path=file_path,
+                    original_filename=os.path.basename(file_path),
+                    source_type=source_type
+                )
+            else:
+                original_image_id = original_image['_id']
+            
+            # Create version record
+            version_number = ImageMetadataService.get_next_version_number(original_image_id)
+            ImageMetadataService.create_image_version(
+                original_image_id=original_image_id,
                 processed_path=cached_path,
-                operation=operation_key,
-                source_type=source_type
+                operation_params={
+                    "resize": {
+                        "apply": True,
+                        "width": width,
+                        "height": height,
+                        "type": resize_type
+                    }
+                }
+            )
+            
+            # Cache the version
+            ImageCacheService.cache_image_version(
+                original_image_id=original_image_id,
+                version_number=version_number,
+                processed_path=cached_path,
+                operation_params={
+                    "resize": {
+                        "apply": True,
+                        "width": width,
+                        "height": height,
+                        "type": resize_type
+                    }
+                }
             )
             
             return cached_path
@@ -413,6 +551,48 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
         # Save the resized image
         resized_img.save(output_path)
         
+        # Get or create original image record
+        original_image = ImageMetadataService.get_original_image_by_path(file_path)
+        if not original_image:
+            original_image_id = ImageMetadataService.save_original_image(
+                filename=filename,
+                file_path=file_path,
+                original_filename=filename,
+                source_type=source_type
+            )
+        else:
+            original_image_id = original_image['_id']
+        
+        # Create version record
+        version_number = ImageMetadataService.get_next_version_number(original_image_id)
+        ImageMetadataService.create_image_version(
+            original_image_id=original_image_id,
+            processed_path=output_path,
+            operation_params={
+                "resize": {
+                    "apply": True,
+                    "width": width,
+                    "height": height,
+                    "type": resize_type
+                }
+            }
+        )
+        
+        # Cache the version
+        ImageCacheService.cache_image_version(
+            original_image_id=original_image_id,
+            version_number=version_number,
+            processed_path=output_path,
+            operation_params={
+                "resize": {
+                    "apply": True,
+                    "width": width,
+                    "height": height,
+                    "type": resize_type
+                }
+            }
+        )
+        
         # Log the operation
         log_operation(
             image_name=filename,
@@ -424,24 +604,10 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
                 "output_filename": output_filename,
                 "original_dimensions": f"{original_width}x{original_height}",
                 "new_dimensions": f"{new_width}x{new_height}",
-                "resize_type": resize_type
+                "resize_type": resize_type,
+                "original_image_id": str(original_image_id),
+                "version_number": version_number
             }
-        )
-
-        # Cache the processed image
-        ImageCacheService.cache_processed_image(
-            file_path, 
-            output_path, 
-            operation_key
-        )
-
-        # Save processing metadata to MongoDB
-        ImageMetadataService.save_processed_image(
-            original_filename=filename,
-            original_path=file_path,
-            processed_path=output_path,
-            operation=operation_key,
-            source_type=source_type
         )
         
         return output_path
@@ -452,18 +618,14 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
         image_name = os.path.basename(file_path)
         log_operation(
             image_name=image_name,
-            operation="resize",
+            operation=operation_key,
             source_type=source_type,
             status="error",
             details={"error": str(e)}
         )
         
-        # Re-raise with a user-friendly message
-        if isinstance(e, ValueError):
-            raise ValueError(str(e))
-        else:
-            raise Exception(f"Error processing image: {str(e)}")
-        
+        return None
+
 def remove_background(file_path, source_type="upload"):
     """
     Remove the background from an image, keeping only the foreground subject.
@@ -487,13 +649,32 @@ def remove_background(file_path, source_type="upload"):
             # Log cache hit
             current_app.logger.info(f"Cache hit for background removal: {file_path}")
             
-            # Update MongoDB with processing info (reusing cached version)
-            ImageMetadataService.save_processed_image(
-                original_filename=os.path.basename(file_path),
-                original_path=file_path,
+            # Get or create original image record
+            original_image = ImageMetadataService.get_original_image_by_path(file_path)
+            if not original_image:
+                original_image_id = ImageMetadataService.save_original_image(
+                    filename=os.path.basename(file_path),
+                    file_path=file_path,
+                    original_filename=os.path.basename(file_path),
+                    source_type=source_type
+                )
+            else:
+                original_image_id = original_image['_id']
+            
+            # Create version record
+            version_number = ImageMetadataService.get_next_version_number(original_image_id)
+            ImageMetadataService.create_image_version(
+                original_image_id=original_image_id,
                 processed_path=cached_path,
-                operation="bg_removal",
-                source_type=source_type
+                operation_params={"remove_background": True}
+            )
+            
+            # Cache the version
+            ImageCacheService.cache_image_version(
+                original_image_id=original_image_id,
+                version_number=version_number,
+                processed_path=cached_path,
+                operation_params={"remove_background": True}
             )
             
             return cached_path
@@ -516,12 +697,40 @@ def remove_background(file_path, source_type="upload"):
         
         # Create unique filename for processed image - always use PNG for transparency
         filename = os.path.basename(file_path)
-        name, _ = os.path.splitext(filename)  # Ignore original extension
+        name, _ = os.path.splitext(filename)
         output_filename = f"nobg_{name}_{uuid.uuid4().hex}.png"
         output_path = os.path.join(output_dir, output_filename)
         
         # Save the processed image as PNG to preserve transparency
         output_img.save(output_path, 'PNG')
+        
+        # Get or create original image record
+        original_image = ImageMetadataService.get_original_image_by_path(file_path)
+        if not original_image:
+            original_image_id = ImageMetadataService.save_original_image(
+                filename=filename,
+                file_path=file_path,
+                original_filename=filename,
+                source_type=source_type
+            )
+        else:
+            original_image_id = original_image['_id']
+        
+        # Create version record
+        version_number = ImageMetadataService.get_next_version_number(original_image_id)
+        ImageMetadataService.create_image_version(
+            original_image_id=original_image_id,
+            processed_path=output_path,
+            operation_params={"remove_background": True}
+        )
+        
+        # Cache the version
+        ImageCacheService.cache_image_version(
+            original_image_id=original_image_id,
+            version_number=version_number,
+            processed_path=output_path,
+            operation_params={"remove_background": True}
+        )
         
         # Log the operation
         log_operation(
@@ -531,24 +740,10 @@ def remove_background(file_path, source_type="upload"):
             details={
                 "input_path": file_path,
                 "output_path": output_path,
-                "output_filename": output_filename
+                "output_filename": output_filename,
+                "original_image_id": str(original_image_id),
+                "version_number": version_number
             }
-        )
-
-        # Cache the processed image
-        ImageCacheService.cache_processed_image(
-            file_path, 
-            output_path, 
-            "bg_removal"
-        )
-
-        # Save processing metadata to MongoDB
-        ImageMetadataService.save_processed_image(
-            original_filename=filename,
-            original_path=file_path,
-            processed_path=output_path,
-            operation="bg_removal",
-            source_type=source_type
         )
         
         return output_path
@@ -616,14 +811,32 @@ def apply_transformations(file_path, transformations, source_type="upload"):
             # Log cache hit
             current_app.logger.info(f"Cache hit for combined transformations: {file_path}")
             
-            # Update MongoDB with processing info (reusing cached version)
-            ImageMetadataService.save_processed_image(
-                original_filename=os.path.basename(file_path),
-                original_path=file_path,
+            # Get or create original image record
+            original_image = ImageMetadataService.get_original_image_by_path(file_path)
+            if not original_image:
+                original_image_id = ImageMetadataService.save_original_image(
+                    filename=os.path.basename(file_path),
+                    file_path=file_path,
+                    original_filename=os.path.basename(file_path),
+                    source_type=source_type
+                )
+            else:
+                original_image_id = original_image['_id']
+            
+            # Create version record
+            version_number = ImageMetadataService.get_next_version_number(original_image_id)
+            ImageMetadataService.create_image_version(
+                original_image_id=original_image_id,
                 processed_path=cached_path,
-                operation="combined_transformations",
-                source_type=source_type,
-                params=transformations
+                operation_params=transformations
+            )
+            
+            # Cache the version
+            ImageCacheService.cache_image_version(
+                original_image_id=original_image_id,
+                version_number=version_number,
+                processed_path=cached_path,
+                operation_params=transformations
             )
             
             return cached_path
@@ -689,11 +902,32 @@ def apply_transformations(file_path, transformations, source_type="upload"):
         
         # Cache the final result with the combined operation key
         if operations_applied and current_path != file_path:
-            # Save the final result path to the Redis cache
-            ImageCacheService.cache_processed_image(
-                file_path, 
-                current_path, 
-                operation_key
+            # Get or create original image record
+            original_image = ImageMetadataService.get_original_image_by_path(file_path)
+            if not original_image:
+                original_image_id = ImageMetadataService.save_original_image(
+                    filename=os.path.basename(file_path),
+                    file_path=file_path,
+                    original_filename=os.path.basename(file_path),
+                    source_type=source_type
+                )
+            else:
+                original_image_id = original_image['_id']
+            
+            # Create version record
+            version_number = ImageMetadataService.get_next_version_number(original_image_id)
+            ImageMetadataService.create_image_version(
+                original_image_id=original_image_id,
+                processed_path=current_path,
+                operation_params=transformations
+            )
+            
+            # Cache the version
+            ImageCacheService.cache_image_version(
+                original_image_id=original_image_id,
+                version_number=version_number,
+                processed_path=current_path,
+                operation_params=transformations
             )
             
             # Log the combined operation
@@ -705,18 +939,10 @@ def apply_transformations(file_path, transformations, source_type="upload"):
                     "input_path": file_path,
                     "output_path": current_path,
                     "operations_applied": operations_applied,
-                    "transformations": transformations
+                    "transformations": transformations,
+                    "original_image_id": str(original_image_id),
+                    "version_number": version_number
                 }
-            )
-            
-            # Save combined processing metadata to MongoDB
-            ImageMetadataService.save_processed_image(
-                original_filename=os.path.basename(file_path),
-                original_path=file_path,
-                processed_path=current_path,
-                operation="combined_transformations",
-                source_type=source_type,
-                params=transformations
             )
             
         return current_path
