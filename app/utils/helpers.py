@@ -102,7 +102,7 @@ def download_image_from_url(url):
 
     if already_processed:
         # If the image was already downloaded before, check if file still exists
-        file_path = existing_record.get('processed_images')[0].get('file_path')
+        file_path = existing_record.get('file_path')
         if file_path and os.path.exists(file_path):
             # Return the existing file
             return existing_record.get('filename'), file_path

@@ -5,6 +5,7 @@ from PIL import Image
 import numpy as np
 from flask import current_app
 import datetime
+from bson.objectid import ObjectId
 
 class ImageCacheService:
     """Service for caching processed images using Redis"""
@@ -155,6 +156,10 @@ class ImageCacheService:
             param_hash = ImageCacheService.generate_operation_param_hash(operation_params)
             if not param_hash:
                 return False
+            
+            # Convert ObjectId to string if needed
+            if isinstance(original_image_id, ObjectId):
+                original_image_id = str(original_image_id)
             
             # Store version metadata
             version_metadata = {
