@@ -10,6 +10,8 @@ from app.core.image_processor import process_image, convert_to_grayscale, apply_
 from flasgger import swag_from
 from app.services.redis_service import ImageCacheService
 import json
+from app.services.mongodb_service import ImageMetadataService
+
 
 image_bp = Blueprint('image', __name__)
 
@@ -1889,4 +1891,170 @@ def transform_image_from_url():
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         current_app.logger.error(f"Error applying transformations: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@image_bp.route('/versions/<image_id>', methods=['GET'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Get version information for an image",
+    "description": "Retrieve information about all versions of an image, including the original and all processed versions.",
+    "parameters": [
+        {
+            "name": "image_id",
+            "in": "path",
+            "description": "ID of the original image",
+            "required": True,
+            "type": "string"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Version information",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "original_image": {
+                        "type": "object",
+                        "properties": {
+                            "id": {"type": "string"},
+                            "filename": {"type": "string"},
+                            "file_path": {"type": "string"},
+                            "original_filename": {"type": "string"},
+                            "source_type": {"type": "string"},
+                            "upload_date": {"type": "string"},
+                            "version_count": {"type": "integer"}
+                        }
+                    },
+                    "versions": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "version_number": {"type": "integer"},
+                                "processed_path": {"type": "string"},
+                                "operation_params": {"type": "object"},
+                                "creation_date": {"type": "string"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "404": {
+            "description": "Image not found",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def get_image_versions(image_id):
+    """
+    Get version information for an image.
+    
+    Args:
+        image_id: ID of the original image
+        
+    Returns:
+        JSON object containing original image info and all versions
+    """
+    try:
+        original_image = ImageMetadataService.get_original_image(image_id)
+        if not original_image:
+            return jsonify({'error': 'Image not found'}), 404
+        
+        versions = ImageMetadataService.get_image_versions(image_id)
+        
+        response = {
+            'original_image': {
+                'id': str(original_image['_id']),
+                'filename': original_image['filename'],
+                'file_path': original_image['file_path'],
+                'original_filename': original_image['original_filename'],
+                'source_type': original_image['source_type'],
+                'upload_date': original_image['upload_date'].isoformat(),
+                'version_count': original_image['version_count']
+            },
+            'versions': [
+                {
+                    'version_number': version['version_number'],
+                    'processed_path': version['processed_path'],
+                    'operation_params': version['operation_params'],
+                    'creation_date': version['creation_date'].isoformat()
+                }
+                for version in versions
+            ]
+        }
+        
+        return jsonify(response), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting image versions: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@image_bp.route('/versions/<image_id>/<int:version_number>', methods=['GET'])
+@swag_from({
+    "tags": ["Image Operations"],
+    "summary": "Get a specific version of an image",
+    "description": "Retrieve a specific version of an image by its version number.",
+    "parameters": [
+        {
+            "name": "image_id",
+            "in": "path",
+            "description": "ID of the original image",
+            "required": True,
+            "type": "string"
+        },
+        {
+            "name": "version_number",
+            "in": "path",
+            "description": "Version number to retrieve",
+            "required": True,
+            "type": "integer"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Image version",
+            "content": {
+                "image/*": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        "404": {
+            "description": "Image or version not found",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def get_image_version(image_id, version_number):
+    """
+    Get a specific version of an image.
+    
+    Args:
+        image_id: ID of the original image
+        version_number: Version number to retrieve
+        
+    Returns:
+        The processed image file
+    """
+    try:
+        version = ImageMetadataService.get_image_version(image_id, version_number)
+        if not version:
+            return jsonify({'error': 'Version not found'}), 404
+        
+        image_response = get_image_response(version['processed_path'])
+        if image_response:
+            return image_response
+        
+        return jsonify({'error': 'Image file not found'}), 404
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting image version: {str(e)}")
         return jsonify({'error': str(e)}), 500

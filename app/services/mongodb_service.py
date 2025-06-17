@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from bson.objectid import ObjectId
+from flask import current_app
 
 class ImageMetadataService:
     def __init__(self, db):
@@ -19,6 +20,7 @@ class ImageMetadataService:
         self.images_collection.create_index("file_path", unique=True)
         self.images_collection.create_index("image_hash")
         self.images_collection.create_index("upload_date")
+        self.images_collection.create_index("source_url")  # Add index for source_url
         
         # Indexes for versions
         self.versions_collection.create_index("original_image_id")
@@ -220,3 +222,197 @@ class ImageMetadataService:
             }
         except Exception:
             return None
+
+    @classmethod
+    def is_url_processed(cls, url):
+        """
+        Check if an image from a URL has already been processed.
+        
+        Args:
+            url: The URL to check
+            
+        Returns:
+            tuple: (bool, dict) - (True if processed, record if found)
+        """
+        try:
+            # Get database instance from current app
+            db = current_app.db
+            # Find image with matching source_url
+            record = db.images.find_one({"source_url": url})
+            if record:
+                return True, record
+            return False, None
+        except Exception as e:
+            current_app.logger.error(f"Error checking URL processing status: {str(e)}")
+            return False, None
+
+    @classmethod
+    def save_upload_metadata(cls, filename, file_path, original_filename, source_type="upload", source_url=None):
+        """
+        Save metadata for an uploaded image.
+        
+        Args:
+            filename: The saved filename
+            file_path: Path where the file is saved
+            original_filename: Original filename from upload
+            source_type: Type of upload (upload, url)
+            source_url: URL if source_type is url
+            
+        Returns:
+            str: ID of the saved record
+        """
+        try:
+            db = current_app.db
+            # Create metadata record
+            metadata = {
+                "filename": filename,
+                "file_path": file_path,
+                "original_filename": original_filename,
+                "source_type": source_type,
+                "source_url": source_url,
+                "upload_date": datetime.datetime.utcnow(),
+                "version_count": 0
+            }
+            
+            # Insert record
+            result = db.images.insert_one(metadata)
+            return str(result.inserted_id)
+        except Exception as e:
+            current_app.logger.error(f"Error saving upload metadata: {str(e)}")
+            return None
+
+    @classmethod
+    def get_original_image_by_path(cls, file_path):
+        """
+        Get an original image record by its file path.
+        
+        Args:
+            file_path: Path to the image file
+            
+        Returns:
+            dict: Image record if found, None otherwise
+        """
+        try:
+            db = current_app.db
+            return db.images.find_one({"file_path": file_path})
+        except Exception as e:
+            current_app.logger.error(f"Error getting original image by path: {str(e)}")
+            return None
+
+    @classmethod
+    def save_original_image(cls, filename, file_path, original_filename, source_type="upload", source_url=None):
+        """
+        Save metadata for an original image.
+        
+        Args:
+            filename: The saved filename
+            file_path: Path where the file is saved
+            original_filename: Original filename
+            source_type: Type of upload (upload, url)
+            source_url: URL if source_type is url
+            
+        Returns:
+            str: ID of the saved record
+        """
+        try:
+            db = current_app.db
+            # Create metadata record
+            metadata = {
+                "filename": filename,
+                "file_path": file_path,
+                "original_filename": original_filename,
+                "source_type": source_type,
+                "source_url": source_url,
+                "upload_date": datetime.datetime.utcnow(),
+                "version_count": 0
+            }
+            
+            # Insert record
+            result = db.images.insert_one(metadata)
+            return str(result.inserted_id)
+        except Exception as e:
+            current_app.logger.error(f"Error saving original image: {str(e)}")
+            return None
+
+    @classmethod
+    def get_next_version_number(cls, original_image_id):
+        """
+        Get the next available version number for an image.
+        
+        Args:
+            original_image_id: ID of the original image
+            
+        Returns:
+            int: Next version number
+        """
+        try:
+            db = current_app.db
+            highest_version = db.image_versions.find_one(
+                {"original_image_id": original_image_id},
+                sort=[("version_number", -1)]
+            )
+            
+            if highest_version:
+                return highest_version["version_number"] + 1
+            return 1
+        except Exception as e:
+            current_app.logger.error(f"Error getting next version number: {str(e)}")
+            return 1
+
+    @classmethod
+    def create_image_version(cls, original_image_id, processed_path, operation_params):
+        """
+        Create a new version of an image.
+        
+        Args:
+            original_image_id: ID of the original image
+            processed_path: Path to the processed image
+            operation_params: Parameters used for processing
+            
+        Returns:
+            str: ID of the created version
+        """
+        try:
+            db = current_app.db
+            # Generate operation parameter hash
+            operation_param_hash = cls.generate_operation_param_hash(operation_params)
+            
+            # Get next version number
+            version_number = cls.get_next_version_number(original_image_id)
+            
+            # Create new version document
+            version_data = {
+                "original_image_id": original_image_id,
+                "processed_path": processed_path,
+                "created_date": datetime.datetime.utcnow(),
+                "version_number": version_number,
+                "operation_param_hash": operation_param_hash,
+                "operation_params": operation_params
+            }
+            
+            result = db.image_versions.insert_one(version_data)
+            
+            # Update version count on original image
+            db.images.update_one(
+                {"_id": ObjectId(original_image_id)},
+                {"$inc": {"version_count": 1}}
+            )
+            
+            return str(result.inserted_id)
+        except Exception as e:
+            current_app.logger.error(f"Error creating image version: {str(e)}")
+            return None
+
+    @staticmethod
+    def generate_operation_param_hash(operation_params):
+        """
+        Generate a hash for operation parameters.
+        
+        Args:
+            operation_params: Dictionary of operation parameters
+            
+        Returns:
+            str: Hash of the parameters
+        """
+        params_str = json.dumps(operation_params, sort_keys=True)
+        return hashlib.sha256(params_str.encode()).hexdigest()

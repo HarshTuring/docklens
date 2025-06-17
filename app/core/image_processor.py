@@ -76,8 +76,10 @@ def convert_to_grayscale(file_path, source_type="upload"):
             ImageCacheService.cache_image_version(
                 original_image_id=original_image_id,
                 version_number=version_number,
+                original_path=file_path,
                 processed_path=cached_path,
-                operation_params={"grayscale": True}
+                operation_params={"grayscale": True},
+                image_hash=ImageCacheService.calculate_exact_hash(cached_path)
             )
             
             return cached_path
@@ -124,8 +126,10 @@ def convert_to_grayscale(file_path, source_type="upload"):
         ImageCacheService.cache_image_version(
             original_image_id=original_image_id,
             version_number=version_number,
+            original_path=file_path,
             processed_path=output_path,
-            operation_params={"grayscale": True}
+            operation_params={"grayscale": True},
+            image_hash=ImageCacheService.calculate_exact_hash(output_path)
         )
         
         # Log the operation
@@ -206,8 +210,10 @@ def apply_blur(file_path, radius=2.0, source_type="upload"):
             ImageCacheService.cache_image_version(
                 original_image_id=original_image_id,
                 version_number=version_number,
+                original_path=file_path,
                 processed_path=cached_path,
-                operation_params={"blur": {"apply": True, "radius": radius}}
+                operation_params={"blur": {"apply": True, "radius": radius}},
+                image_hash=ImageCacheService.calculate_exact_hash(cached_path)
             )
             
             return cached_path
@@ -255,8 +261,10 @@ def apply_blur(file_path, radius=2.0, source_type="upload"):
         ImageCacheService.cache_image_version(
             original_image_id=original_image_id,
             version_number=version_number,
+            original_path=file_path,
             processed_path=output_path,
-            operation_params={"blur": {"apply": True, "radius": radius}}
+            operation_params={"blur": {"apply": True, "radius": radius}},
+            image_hash=ImageCacheService.calculate_exact_hash(output_path)
         )
         
         # Log the operation
@@ -338,8 +346,10 @@ def rotate_image(file_path, angle=0, source_type="upload"):
             ImageCacheService.cache_image_version(
                 original_image_id=original_image_id,
                 version_number=version_number,
+                original_path=file_path,
                 processed_path=cached_path,
-                operation_params={"rotate": {"apply": True, "angle": angle}}
+                operation_params={"rotate": {"apply": True, "angle": angle}},
+                image_hash=ImageCacheService.calculate_exact_hash(cached_path)
             )
             
             return cached_path
@@ -386,8 +396,10 @@ def rotate_image(file_path, angle=0, source_type="upload"):
         ImageCacheService.cache_image_version(
             original_image_id=original_image_id,
             version_number=version_number,
+            original_path=file_path,
             processed_path=output_path,
-            operation_params={"rotate": {"apply": True, "angle": angle}}
+            operation_params={"rotate": {"apply": True, "angle": angle}},
+            image_hash=ImageCacheService.calculate_exact_hash(output_path)
         )
         
         # Log the operation
@@ -498,6 +510,7 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
             ImageCacheService.cache_image_version(
                 original_image_id=original_image_id,
                 version_number=version_number,
+                original_path=file_path,
                 processed_path=cached_path,
                 operation_params={
                     "resize": {
@@ -506,7 +519,8 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
                         "height": height,
                         "type": resize_type
                     }
-                }
+                },
+                image_hash=ImageCacheService.calculate_exact_hash(cached_path)
             )
             
             return cached_path
@@ -582,6 +596,7 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
         ImageCacheService.cache_image_version(
             original_image_id=original_image_id,
             version_number=version_number,
+            original_path=file_path,
             processed_path=output_path,
             operation_params={
                 "resize": {
@@ -590,7 +605,8 @@ def resize_image(file_path, width=None, height=None, resize_type="maintain_aspec
                     "height": height,
                     "type": resize_type
                 }
-            }
+            },
+            image_hash=ImageCacheService.calculate_exact_hash(output_path)
         )
         
         # Log the operation
@@ -673,8 +689,10 @@ def remove_background(file_path, source_type="upload"):
             ImageCacheService.cache_image_version(
                 original_image_id=original_image_id,
                 version_number=version_number,
+                original_path=file_path,
                 processed_path=cached_path,
-                operation_params={"remove_background": True}
+                operation_params={"remove_background": True},
+                image_hash=ImageCacheService.calculate_exact_hash(cached_path)
             )
             
             return cached_path
@@ -728,8 +746,10 @@ def remove_background(file_path, source_type="upload"):
         ImageCacheService.cache_image_version(
             original_image_id=original_image_id,
             version_number=version_number,
+            original_path=file_path,
             processed_path=output_path,
-            operation_params={"remove_background": True}
+            operation_params={"remove_background": True},
+            image_hash=ImageCacheService.calculate_exact_hash(output_path)
         )
         
         # Log the operation
@@ -835,8 +855,10 @@ def apply_transformations(file_path, transformations, source_type="upload"):
             ImageCacheService.cache_image_version(
                 original_image_id=original_image_id,
                 version_number=version_number,
+                original_path=file_path,
                 processed_path=cached_path,
-                operation_params=transformations
+                operation_params=transformations,
+                image_hash=ImageCacheService.calculate_exact_hash(cached_path)
             )
             
             return cached_path
@@ -926,8 +948,10 @@ def apply_transformations(file_path, transformations, source_type="upload"):
             ImageCacheService.cache_image_version(
                 original_image_id=original_image_id,
                 version_number=version_number,
+                original_path=file_path,
                 processed_path=current_path,
-                operation_params=transformations
+                operation_params=transformations,
+                image_hash=ImageCacheService.calculate_exact_hash(current_path)
             )
             
             # Log the combined operation
