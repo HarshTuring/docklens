@@ -13,6 +13,8 @@ class ImageCacheService:
     EXACT_HASH_PREFIX = "exact_hash:"
     PHASH_PREFIX = "phash:"
     METADATA_PREFIX = "img_meta:"
+    VERSION_PREFIX = "version:"  # New prefix for versioning
+    VERSION_PARAMS_PREFIX = "version_params:"  # New prefix for version parameter lookup
     
     @staticmethod
     def get_redis():
@@ -67,6 +69,16 @@ class ImageCacheService:
             return 0
     
     @staticmethod
+    def generate_operation_param_hash(operation_params):
+        """Generate a hash for operation parameters."""
+        try:
+            params_str = json.dumps(operation_params, sort_keys=True)
+            return hashlib.sha256(params_str.encode()).hexdigest()
+        except Exception as e:
+            current_app.logger.error(f"Error generating param hash: {str(e)}")
+            return None
+            
+    @staticmethod
     def cache_processed_image(original_path, processed_path, operation):
         """
         Cache a processed image in Redis
@@ -117,6 +129,127 @@ class ImageCacheService:
         except Exception as e:
             current_app.logger.error(f"Error caching processed image: {str(e)}")
             return False
+    
+    @staticmethod
+    def cache_image_version(original_image_id, version_number, original_path, processed_path, 
+                           operation_params, image_hash, expiry=604800):  # Default 1 week
+        """
+        Cache a specific image version
+        
+        Args:
+            original_image_id: MongoDB ID of the original image
+            version_number: Version number
+            original_path: Path to the original image
+            processed_path: Path to the processed version
+            operation_params: Dictionary of transformation parameters
+            image_hash: Hash of the processed image
+            expiry: Cache expiry time in seconds
+            
+        Returns:
+            bool: Success status
+        """
+        try:
+            redis_client = ImageCacheService.get_redis()
+            
+            # Generate param hash for lookup
+            param_hash = ImageCacheService.generate_operation_param_hash(operation_params)
+            if not param_hash:
+                return False
+            
+            # Store version metadata
+            version_metadata = {
+                "original_image_id": original_image_id,
+                "version_number": version_number,
+                "original_path": original_path,
+                "processed_path": processed_path,
+                "operation_params": operation_params,
+                "param_hash": param_hash,
+                "image_hash": image_hash,
+                "cached_at": datetime.datetime.utcnow().isoformat()
+            }
+            
+            # Create version key (by ID and version number)
+            version_key = f"{ImageCacheService.VERSION_PREFIX}{original_image_id}:{version_number}"
+            redis_client.setex(version_key, expiry, json.dumps(version_metadata))
+            
+            # Create parameter-based lookup key
+            param_key = f"{ImageCacheService.VERSION_PARAMS_PREFIX}{original_image_id}:{param_hash}"
+            redis_client.setex(param_key, expiry, json.dumps(version_metadata))
+            
+            # Track version in stats
+            redis_client.hincrby("cache:stats:version", "stored", 1)
+            
+            return True
+        except Exception as e:
+            current_app.logger.error(f"Error caching image version: {str(e)}")
+            return False
+    
+    @staticmethod
+    def get_version_by_id(original_image_id, version_number):
+        """
+        Get a specific image version by its ID and version number
+        
+        Args:
+            original_image_id: MongoDB ID of the original image
+            version_number: Version number
+            
+        Returns:
+            dict: Version metadata if found, None otherwise
+        """
+        try:
+            redis_client = ImageCacheService.get_redis()
+            
+            # Create version key
+            version_key = f"{ImageCacheService.VERSION_PREFIX}{original_image_id}:{version_number}"
+            cached_version = redis_client.get(version_key)
+            
+            if cached_version:
+                # Record hit
+                redis_client.hincrby("cache:stats:version", "hits", 1)
+                return json.loads(cached_version)
+            
+            # Record miss
+            redis_client.hincrby("cache:stats:version", "misses", 1)
+            return None
+        except Exception as e:
+            current_app.logger.error(f"Error retrieving version: {str(e)}")
+            return None
+    
+    @staticmethod
+    def find_version_by_params(original_image_id, operation_params):
+        """
+        Find a cached version by original image ID and operation parameters
+        
+        Args:
+            original_image_id: MongoDB ID of the original image
+            operation_params: Dictionary of transformation parameters
+            
+        Returns:
+            dict: Version metadata if found, None otherwise
+        """
+        try:
+            redis_client = ImageCacheService.get_redis()
+            
+            # Generate param hash
+            param_hash = ImageCacheService.generate_operation_param_hash(operation_params)
+            if not param_hash:
+                return None
+            
+            # Create parameter lookup key
+            param_key = f"{ImageCacheService.VERSION_PARAMS_PREFIX}{original_image_id}:{param_hash}"
+            cached_version = redis_client.get(param_key)
+            
+            if cached_version:
+                # Record hit
+                redis_client.hincrby("cache:stats:version", "hits", 1)
+                return json.loads(cached_version)
+            
+            # Record miss
+            redis_client.hincrby("cache:stats:version", "misses", 1)
+            return None
+        except Exception as e:
+            current_app.logger.error(f"Error finding version by params: {str(e)}")
+            return None
     
     @staticmethod
     def find_processed_image(image_path, operation, similarity_threshold=0.97):
@@ -189,6 +322,43 @@ class ImageCacheService:
             return None
     
     @staticmethod
+    def get_version_stats():
+        """Get statistics about version caching"""
+        try:
+            redis_client = ImageCacheService.get_redis()
+            
+            # Get basic hit/miss stats
+            stats = redis_client.hgetall("cache:stats:version")
+            
+            # Convert bytes to string and numbers
+            result = {}
+            for key, value in stats.items():
+                key_str = key.decode('utf-8') if isinstance(key, bytes) else key
+                result[key_str] = int(value)
+            
+            # Calculate hit ratio
+            hits = result.get('hits', 0)
+            misses = result.get('misses', 0)
+            total = hits + misses
+            
+            if total > 0:
+                result['hit_ratio'] = round((hits / total) * 100, 2)
+            else:
+                result['hit_ratio'] = 0
+                
+            # Count active version keys
+            version_keys = redis_client.keys(f"{ImageCacheService.VERSION_PREFIX}*")
+            result['active_version_keys'] = len(version_keys)
+            
+            param_keys = redis_client.keys(f"{ImageCacheService.VERSION_PARAMS_PREFIX}*")
+            result['active_param_keys'] = len(param_keys)
+            
+            return result
+        except Exception as e:
+            current_app.logger.error(f"Error getting version stats: {str(e)}")
+            return {"error": str(e)}
+    
+    @staticmethod
     def clear_cache():
         """Clear all image caching data from Redis"""
         try:
@@ -197,13 +367,50 @@ class ImageCacheService:
             exact_keys = redis_client.keys(f"{ImageCacheService.EXACT_HASH_PREFIX}*")
             phash_keys = redis_client.keys(f"{ImageCacheService.PHASH_PREFIX}*")
             meta_keys = redis_client.keys(f"{ImageCacheService.METADATA_PREFIX}*")
+            version_keys = redis_client.keys(f"{ImageCacheService.VERSION_PREFIX}*")
+            param_keys = redis_client.keys(f"{ImageCacheService.VERSION_PARAMS_PREFIX}*")
             
             # Delete all keys
-            all_keys = exact_keys + phash_keys + meta_keys
+            all_keys = exact_keys + phash_keys + meta_keys + version_keys + param_keys
             if all_keys:
                 redis_client.delete(*all_keys)
+            
+            # Reset stats
+            redis_client.delete("cache:stats:version")
             
             return True
         except Exception as e:
             current_app.logger.error(f"Error clearing cache: {str(e)}")
             return False
+            
+    @staticmethod
+    def clear_version_cache(original_image_id=None):
+        """
+        Clear version cache entries
+        
+        Args:
+            original_image_id: If provided, only clear versions for this image
+            
+        Returns:
+            int: Number of cleared entries
+        """
+        try:
+            redis_client = ImageCacheService.get_redis()
+            
+            if original_image_id:
+                # Clear only specific image versions
+                version_keys = redis_client.keys(f"{ImageCacheService.VERSION_PREFIX}{original_image_id}:*")
+                param_keys = redis_client.keys(f"{ImageCacheService.VERSION_PARAMS_PREFIX}{original_image_id}:*")
+            else:
+                # Clear all versions
+                version_keys = redis_client.keys(f"{ImageCacheService.VERSION_PREFIX}*")
+                param_keys = redis_client.keys(f"{ImageCacheService.VERSION_PARAMS_PREFIX}*")
+                
+            all_keys = version_keys + param_keys
+            
+            if all_keys:
+                return redis_client.delete(*all_keys)
+            return 0
+        except Exception as e:
+            current_app.logger.error(f"Error clearing version cache: {str(e)}")
+            return 0
