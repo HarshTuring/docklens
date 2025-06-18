@@ -18,10 +18,6 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user to run the application
-RUN groupadd -g 1000 appgroup && \
-    useradd -u 1000 -g appgroup -s /bin/bash appuser
-
 # Copy requirements file
 COPY requirements.txt .
 
@@ -29,24 +25,21 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
+# Create necessary directories
+RUN mkdir -p /app/logs
+
 # Copy application code
 COPY . .
-
-# Create necessary directories with correct permissions
-RUN mkdir -p /app/logs && \
-    chown -R appuser:appgroup /app
-
-# Switch to non-root user
-USER appuser
-
-# Expose the port the app runs on
-EXPOSE 5001
 
 # Create entrypoint script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
+# Expose the port the app runs on
+EXPOSE 5001
+
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
+
 # Set default command
 CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "3", "--timeout", "120", "app:app"]
