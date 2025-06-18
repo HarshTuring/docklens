@@ -1,6 +1,7 @@
 from flask import Flask
 from pymongo import MongoClient
 from flask_cors import CORS
+from flasgger import Swagger
 import os
 import logging
 from logging.handlers import RotatingFileHandler
@@ -45,6 +46,49 @@ def create_app():
         r"/users/*": {"origins": os.environ.get('ALLOWED_ORIGINS', '*').split(',')}  # User endpoints more restricted
     })
     
+    # Setup Flasgger
+    swagger_config = {
+        "headers": [],
+        "specs": [
+            {
+                "endpoint": "apispec",
+                "route": "/apispec.json",
+                "rule_filter": lambda rule: True,  # all in
+                "model_filter": lambda tag: True,  # all in
+            }
+        ],
+        "static_url_path": "/flasgger_static",
+        "swagger_ui": True,
+        "specs_route": "/docs/"
+    }
+    
+    swagger_template = {
+        "swagger": "2.0",
+        "info": {
+            "title": "Authentication Service API",
+            "description": "API for user authentication and management",
+            "version": "1.0.0",
+            "contact": {
+                "email": "admin@example.com"
+            },
+        },
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT Authorization header using the Bearer scheme. Example: 'Authorization: Bearer {token}'"
+            }
+        },
+        "security": [
+            {
+                "Bearer": []
+            }
+        ],
+    }
+    
+    Swagger(app, config=swagger_config, template=swagger_template)
+    
     # Initialize models (create indexes)
     with app.app_context():
         from app.models.user import UserModel
@@ -69,7 +113,7 @@ def create_app():
         response.headers['X-Frame-Options'] = 'DENY'
         response.headers['X-XSS-Protection'] = '1; mode=block'
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        response.headers['Content-Security-Policy'] = "default-src 'self'"
+        response.headers['Content-Security-Policy'] = "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' 'unsafe-inline' 'unsafe-eval'; img-src 'self' data: https:; connect-src 'self'"
         return response
     
     return app

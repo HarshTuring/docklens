@@ -5,6 +5,8 @@ from . import auth_bp
 from ..services.auth_service import AuthService
 from functools import wraps
 import time
+from flasgger import swag_from
+
 
 # Schema validation for endpoints
 class RegisterSchema(Schema):
@@ -82,6 +84,91 @@ def validate_request(schema):
 
 @auth_bp.route('/register', methods=['POST'])
 @rate_limited(max_per_minute=5)
+@swag_from({
+    "tags": ["Authentication"],
+    "summary": "Register a new user",
+    "description": "Creates a new user account with the provided details",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["email", "password", "first_name", "last_name"],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "User's email address"
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "Password (min 8 characters)"
+                    },
+                    "first_name": {
+                        "type": "string",
+                        "description": "User's first name"
+                    },
+                    "last_name": {
+                        "type": "string",
+                        "description": "User's last name"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "201": {
+            "description": "User successfully registered",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "User registered successfully"
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "example": "60d21b4667d0d8992e610c85"
+                    },
+                    "email": {
+                        "type": "string",
+                        "example": "user@example.com"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request - invalid input",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Email already registered"
+                    }
+                }
+            }
+        },
+        "429": {
+            "description": "Rate limit exceeded",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Too Many Requests"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Rate limit exceeded"
+                    }
+                }
+            }
+        }
+    }
+})
 def register():
     """Register a new user"""
     try:
@@ -111,6 +198,87 @@ def register():
 
 @auth_bp.route('/login', methods=['POST'])
 @rate_limited(max_per_minute=10)
+@swag_from({
+    "tags": ["Authentication"],
+    "summary": "Login user",
+    "description": "Authenticate user and get access/refresh tokens",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "User's email address"
+                    },
+                    "password": {
+                        "type": "string",
+                        "description": "User's password"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Login successful",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "access_token": {
+                        "type": "string",
+                        "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    },
+                    "refresh_token": {
+                        "type": "string",
+                        "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    },
+                    "expires_in": {
+                        "type": "integer",
+                        "example": 900
+                    },
+                    "token_type": {
+                        "type": "string",
+                        "example": "Bearer"
+                    }
+                }
+            }
+        },
+        "401": {
+            "description": "Authentication failed",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Invalid email or password"
+                    }
+                }
+            }
+        },
+        "429": {
+            "description": "Rate limit exceeded",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Too Many Requests"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Rate limit exceeded"
+                    }
+                }
+            }
+        }
+    }
+})
 def login():
     """Authenticate user and generate tokens"""
     try:
@@ -140,6 +308,62 @@ def login():
         raise BadRequest("Login failed. Please try again later.")
 
 @auth_bp.route('/refresh', methods=['POST'])
+@swag_from({
+    "tags": ["Authentication"],
+    "summary": "Refresh access token",
+    "description": "Get a new access token using a valid refresh token",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["refresh_token"],
+                "properties": {
+                    "refresh_token": {
+                        "type": "string",
+                        "description": "Valid refresh token"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Token refresh successful",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "access_token": {
+                        "type": "string",
+                        "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    },
+                    "expires_in": {
+                        "type": "integer",
+                        "example": 900
+                    },
+                    "token_type": {
+                        "type": "string",
+                        "example": "Bearer"
+                    }
+                }
+            }
+        },
+        "401": {
+            "description": "Invalid refresh token",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Invalid or expired refresh token"
+                    }
+                }
+            }
+        }
+    }
+})
 def refresh_token():
     """Refresh access token"""
     try:
@@ -168,6 +392,54 @@ def refresh_token():
         raise BadRequest("Token refresh failed. Please try again later.")
 
 @auth_bp.route('/logout', methods=['POST'])
+@swag_from({
+    "tags": ["Authentication"],
+    "summary": "Logout user",
+    "description": "Invalidate refresh token to implement logout",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["refresh_token"],
+                "properties": {
+                    "refresh_token": {
+                        "type": "string",
+                        "description": "Refresh token to invalidate"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Logout successful",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Successfully logged out"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Refresh token required"
+                    }
+                }
+            }
+        }
+    }
+})
 def logout():
     """Logout user by revoking refresh token"""
     try:
@@ -195,6 +467,59 @@ def logout():
 
 @auth_bp.route('/password-reset/request', methods=['POST'])
 @rate_limited(max_per_minute=3)
+@swag_from({
+    "tags": ["Password Management"],
+    "summary": "Request password reset",
+    "description": "Request a password reset link to be sent to user's email",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "Email address for account recovery"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Password reset request successful",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "If your email is registered, you will receive a password reset link"
+                    }
+                }
+            }
+        },
+        "429": {
+            "description": "Rate limit exceeded",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Too Many Requests"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Rate limit exceeded"
+                    }
+                }
+            }
+        }
+    }
+})
 def request_password_reset():
     """Request password reset"""
     try:
@@ -220,6 +545,58 @@ def request_password_reset():
         }), 200
 
 @auth_bp.route('/password-reset/confirm', methods=['POST'])
+@swag_from({
+    "tags": ["Password Management"],
+    "summary": "Reset password",
+    "description": "Reset password using the token provided in the reset link",
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "required": True,
+            "schema": {
+                "type": "object",
+                "required": ["token", "new_password"],
+                "properties": {
+                    "token": {
+                        "type": "string",
+                        "description": "Password reset token received via email"
+                    },
+                    "new_password": {
+                        "type": "string",
+                        "description": "New password (min 8 characters)"
+                    }
+                }
+            }
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Password reset successful",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Password reset successful. You can now login with your new password."
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request - invalid token or password",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Invalid or expired token"
+                    }
+                }
+            }
+        }
+    }
+})
 def reset_password():
     """Reset password using token"""
     try:
@@ -246,6 +623,46 @@ def reset_password():
         raise BadRequest("Password reset failed. Please try again later.")
 
 @auth_bp.route('/verify-email/<token>', methods=['GET'])
+@swag_from({
+    "tags": ["Account Management"],
+    "summary": "Verify email address",
+    "description": "Verify user's email address using token sent to their email",
+    "parameters": [
+        {
+            "name": "token",
+            "in": "path",
+            "type": "string",
+            "required": True,
+            "description": "Verification token"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Email verification successful",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "Email verified successfully"
+                    }
+                }
+            }
+        },
+        "400": {
+            "description": "Bad request - invalid token",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Invalid or expired verification token"
+                    }
+                }
+            }
+        }
+    }
+})
 def verify_email(token):
     """Verify user's email using token"""
     try:
@@ -269,6 +686,64 @@ def verify_email(token):
         raise BadRequest("Email verification failed. Please try again later.")
 
 @auth_bp.route('/validate', methods=['POST'])
+@swag_from({
+    "tags": ["Token Management"],
+    "summary": "Validate access token",
+    "description": "Validate a JWT access token (for internal service use)",
+    "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "type": "string",
+            "required": True,
+            "description": "Bearer token to validate"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "Token validation successful",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "valid": {
+                        "type": "boolean",
+                        "example": True
+                    },
+                    "user_id": {
+                        "type": "string",
+                        "example": "60d21b4667d0d8992e610c85"
+                    },
+                    "roles": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": ["user"]
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "example": ["read:profile", "update:profile"]
+                    }
+                }
+            }
+        },
+        "401": {
+            "description": "Invalid token",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Invalid or expired token"
+                    }
+                }
+            }
+        }
+    }
+})
 def validate_token():
     """Validate an access token (for use by other services)"""
     try:
@@ -296,6 +771,57 @@ def validate_token():
         raise Unauthorized("Token validation failed")
 
 @auth_bp.route('/health', methods=['GET'])
+@swag_from({
+    "tags": ["System"],
+    "summary": "Service health check",
+    "description": "Check if the auth service is running correctly and connected to MongoDB",
+    "responses": {
+        "200": {
+            "description": "Service is healthy",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "example": "healthy"
+                    },
+                    "timestamp": {
+                        "type": "number",
+                        "example": 1625176047.433459
+                    },
+                    "service": {
+                        "type": "string",
+                        "example": "auth"
+                    }
+                }
+            }
+        },
+        "500": {
+            "description": "Service is unhealthy",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "example": "unhealthy"
+                    },
+                    "message": {
+                        "type": "string",
+                        "example": "Database connection failed"
+                    },
+                    "timestamp": {
+                        "type": "number",
+                        "example": 1625176047.433459
+                    },
+                    "service": {
+                        "type": "string",
+                        "example": "auth"
+                    }
+                }
+            }
+        }
+    }
+})
 def health_check():
     """Health check endpoint"""
     # Check MongoDB connection
