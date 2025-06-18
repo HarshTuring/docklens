@@ -29,7 +29,7 @@ class TokenModel:
     def get_collection(cls):
         """Get the MongoDB collection for tokens"""
         from flask import current_app
-        return current_app.mongo.db[cls.COLLECTION_NAME]
+        return current_app.db[cls.COLLECTION_NAME]
     
     @classmethod
     def create_indexes(cls):

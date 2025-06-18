@@ -3,7 +3,7 @@ set -e
 
 # Function to check if MongoDB is available
 function mongodb_ready(){
-    nc -z mongodb 27017
+    nc -z mongo 27017
     if [[ $? -ne 0 ]]; then
         echo "MongoDB is not available, waiting..."
         return 1

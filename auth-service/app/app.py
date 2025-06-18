@@ -1,12 +1,12 @@
 from flask import Flask
-from flask_pymongo import PyMongo
+from pymongo import MongoClient
 from flask_cors import CORS
 import os
 import logging
 from logging.handlers import RotatingFileHandler
 
 # Initialize extensions
-mongo = PyMongo()
+mongo_client = None
 
 def create_app():
     """Create and configure the Flask application"""
@@ -33,8 +33,11 @@ def create_app():
     app.logger.setLevel(logging.INFO)
     app.logger.info('Auth service startup')
     
-    # Initialize extensions
-    mongo.init_app(app)
+    # Initialize MongoDB
+    global mongo_client
+    mongo_client = MongoClient(app.config['MONGO_URI'])
+    app.mongo = mongo_client
+    app.db = mongo_client.get_database()
     
     # Setup CORS
     CORS(app, resources={

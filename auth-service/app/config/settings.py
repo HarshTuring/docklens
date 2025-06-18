@@ -1,4 +1,3 @@
-
 import os
 
 class Config:
@@ -30,7 +29,8 @@ class ProductionConfig(Config):
 config_by_name = {
     'development': DevelopmentConfig,
     'testing': TestingConfig,
-    'production': ProductionConfig
+    'production': ProductionConfig,
+    'prod': ProductionConfig  # Add alias for 'prod'
 }
 
 # Default config to use

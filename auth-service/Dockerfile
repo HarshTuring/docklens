@@ -36,10 +36,10 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Expose the port the app runs on
-EXPOSE 5001
+EXPOSE 5002
 
 # Set entrypoint
 ENTRYPOINT ["/entrypoint.sh"]
 
 # Set default command
-CMD ["gunicorn", "--bind", "0.0.0.0:5001", "--workers", "3", "--timeout", "120", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5002", "--workers", "3", "--timeout", "120", "app.app:app"]

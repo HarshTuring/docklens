@@ -1,5 +1,6 @@
+
 from datetime import datetime
-from pymongo import MongoEngine, ASCENDING
+from pymongo import ASCENDING
 from bson import ObjectId
 from flask import current_app
 import bcrypt
@@ -28,7 +29,7 @@ class UserModel:
     def get_collection(cls):
         """Get the MongoDB collection for users"""
         from flask import current_app
-        return current_app.mongo.db[cls.COLLECTION_NAME]
+        return current_app.db[cls.COLLECTION_NAME]
     
     @classmethod
     def create_indexes(cls):
@@ -116,7 +117,7 @@ class UserModel:
         
         # Get default role if roles not specified
         if not roles:
-            default_role = current_app.mongo.db['roles'].find_one({"name": "user"})
+            default_role = current_app.db['roles'].find_one({"name": "user"})
             role_ids = [default_role["_id"]] if default_role else []
         else:
             role_ids = [role if isinstance(role, ObjectId) else ObjectId(role) for role in roles]

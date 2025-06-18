@@ -43,7 +43,7 @@ services:
     container_name: image-processor-auth
     restart: unless-stopped  # Restart on failure, except when manually stopped
     ports:
-      - "5002:5001"
+      - "5002:5002"
     environment:
       - FLASK_APP=app.py
       - FLASK_ENV=prod
@@ -59,7 +59,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5001/health || exit 1"]
+      test: ["CMD", "curl", "-f", "http://localhost:5002/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
