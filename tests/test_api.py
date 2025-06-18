@@ -12,7 +12,9 @@ def test_health_endpoint(client):
     response = client.get('/api/health')
     assert response.status_code == 200
     data = json.loads(response.data)
-    assert data['status'] == 'OK'
+    assert data['status'] == 'healthy'
+    assert 'mongodb' in data
+    assert 'redis' in data
 
 def test_api_root_endpoint(client):
     """Test the API root endpoint."""
@@ -172,3 +174,51 @@ def test_swagger_docs_endpoint(client):
     response = client.get('/docs')
     assert response.status_code == 200
     assert b'swagger' in response.data
+
+def test_connections_endpoint(client):
+    """Test the connections endpoint that checks MongoDB and Redis connectivity."""
+    response = client.get('/api/test/connections')
+    assert response.status_code == 200  # Should be 200 when all connections are successful
+    
+    data = json.loads(response.data)
+    
+    # Check response structure
+    assert 'timestamp' in data
+    assert 'mongodb' in data
+    assert 'redis' in data
+    assert 'overall' in data
+    
+    # Check MongoDB status structure
+    assert 'status' in data['mongodb']
+    assert 'details' in data['mongodb']
+    assert data['mongodb']['status'] == 'connected'
+    
+    # Check Redis status structure
+    assert 'status' in data['redis']
+    assert 'details' in data['redis']
+    assert data['redis']['status'] == 'connected'
+    
+    # Check overall status
+    assert data['overall'] == 'all_connected'
+    
+    # Check MongoDB details
+    mongodb_details = data['mongodb']['details']
+    assert isinstance(mongodb_details, dict)
+    assert 'version' in mongodb_details
+    assert 'uptime_seconds' in mongodb_details
+    assert 'connections' in mongodb_details
+    assert isinstance(mongodb_details['connections'], int)
+    assert isinstance(mongodb_details['uptime_seconds'], (int, float))
+    assert isinstance(mongodb_details['version'], str)
+    
+    # Check Redis details
+    redis_details = data['redis']['details']
+    assert isinstance(redis_details, dict)
+    assert 'version' in redis_details
+    assert 'uptime_seconds' in redis_details
+    assert 'connected_clients' in redis_details
+    assert 'used_memory_human' in redis_details
+    assert isinstance(redis_details['connected_clients'], int)
+    assert isinstance(redis_details['uptime_seconds'], (int, float))
+    assert isinstance(redis_details['version'], str)
+    assert isinstance(redis_details['used_memory_human'], str)
