@@ -9,6 +9,8 @@ class Config:
     MONGODB_URI = os.environ.get('MONGODB_URI', 'mongodb://localhost:27017/image_processing')
     REDIS_URL = os.environ.get('REDIS_URL', 'redis://:redis_password@localhost:6379/0')
 
+    AUTH_SERVICE_URL = os.environ.get('AUTH_SERVICE_URL', 'http://auth-service:5002')
+
 
 class DevelopmentConfig(Config):
     """Development config."""

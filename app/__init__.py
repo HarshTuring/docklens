@@ -17,6 +17,8 @@ def create_app(config_name=None):
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
     os.makedirs(os.path.join(app.static_folder, 'processed_images'), exist_ok=True)
     os.makedirs(os.path.join(app.root_path, app.config['LOG_DIR']), exist_ok=True)
+    os.makedirs(os.path.join(app.root_path, 'middleware'), exist_ok=True)  # Ensure middleware directory exists
+
 
     # Initialize MongoDB
     mongo_client = MongoClient(app.config['MONGODB_URI'])
@@ -97,7 +99,18 @@ def create_app(config_name=None):
                     }
                 }
             }
-        }
+        },
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT Authorization header using the Bearer scheme. Example: 'Authorization: Bearer {token}'"
+            }
+        },
+        "security": [
+            {"Bearer": []}
+        ]
     }
     
     swagger = Swagger(app, config=swagger_config, template=swagger_template)
