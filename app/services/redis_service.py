@@ -80,7 +80,7 @@ class ImageCacheService:
             return None
             
     @staticmethod
-    def cache_processed_image(original_path, processed_path, operation):
+    def cache_processed_image(original_path, processed_path, operation, user_id=None):
         """
         Cache a processed image in Redis
         
@@ -88,6 +88,7 @@ class ImageCacheService:
             original_path: Path to the original image
             processed_path: Path to the processed image
             operation: Type of processing operation (e.g., 'grayscale')
+            user_id: ID of the user who processed the image (optional)
         
         Returns:
             bool: Success status
@@ -109,7 +110,8 @@ class ImageCacheService:
                 "operation": operation,
                 "exact_hash": exact_hash,
                 "phash": phash,
-                "timestamp": datetime.datetime.utcnow().isoformat()
+                "timestamp": datetime.datetime.utcnow().isoformat(),
+                "user_id": user_id  # Store user ID in metadata
             }
             
             # Store by exact hash
@@ -133,7 +135,7 @@ class ImageCacheService:
     
     @staticmethod
     def cache_image_version(original_image_id, version_number, original_path, processed_path, 
-                           operation_params, image_hash, expiry=604800):  # Default 1 week
+                           operation_params, image_hash, expiry=604800, user_id=None):  # Default 1 week
         """
         Cache a specific image version
         
@@ -145,7 +147,8 @@ class ImageCacheService:
             operation_params: Dictionary of transformation parameters
             image_hash: Hash of the processed image
             expiry: Cache expiry time in seconds
-            
+            user_id: ID of the user who created this version (optional)
+        
         Returns:
             bool: Success status
         """
@@ -170,7 +173,8 @@ class ImageCacheService:
                 "operation_params": operation_params,
                 "param_hash": param_hash,
                 "image_hash": image_hash,
-                "cached_at": datetime.datetime.utcnow().isoformat()
+                "cached_at": datetime.datetime.utcnow().isoformat(),
+                "user_id": user_id  # Store user ID in version metadata
             }
             
             # Create version key (by ID and version number)
@@ -419,3 +423,53 @@ class ImageCacheService:
         except Exception as e:
             current_app.logger.error(f"Error clearing version cache: {str(e)}")
             return 0
+    
+    @staticmethod
+    def get_user_cached_versions(user_id):
+        """
+        Get all cached image versions for a specific user.
+        Args:
+            user_id: ID of the user
+        Returns:
+            list: List of version metadata dicts
+        """
+        try:
+            redis_client = ImageCacheService.get_redis()
+            version_keys = redis_client.keys(f"{ImageCacheService.VERSION_PREFIX}*")
+            user_versions = []
+            for key in version_keys:
+                data = redis_client.get(key)
+                if data:
+                    meta = json.loads(data)
+                    if meta.get("user_id") == user_id:
+                        user_versions.append(meta)
+            return user_versions
+        except Exception as e:
+            current_app.logger.error(f"Error getting user cached versions: {str(e)}")
+            return []
+    
+    @staticmethod
+    def get_user_cache_stats(user_id):
+        """
+        Get cache statistics for a specific user.
+        Args:
+            user_id: ID of the user
+        Returns:
+            dict: User cache statistics
+        """
+        try:
+            user_versions = ImageCacheService.get_user_cached_versions(user_id)
+            total_versions = len(user_versions)
+            operations = {}
+            for v in user_versions:
+                op = v.get("operation_params", {}).get("operation", "other")
+                operations[op] = operations.get(op, 0) + 1
+            return {
+                "user_id": user_id,
+                "total_versions": total_versions,
+                "operations_by_type": operations,
+                "recent_versions": sorted(user_versions, key=lambda x: x.get("cached_at", ""), reverse=True)[:5]
+            }
+        except Exception as e:
+            current_app.logger.error(f"Error getting user cache stats: {str(e)}")
+            return {"error": str(e)}

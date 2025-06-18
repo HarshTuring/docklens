@@ -44,3 +44,4 @@ ENV/
 # Logs
 *.log
 app/logs/*
+*/logs/*
