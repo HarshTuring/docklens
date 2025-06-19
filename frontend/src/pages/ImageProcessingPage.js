@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { imageApi } from '../api/images';
-// import '../styles/components/imageProcessing.scss';
+import '../styles/components/imageProcessing.scss';
 
 const ImageProcessingPage = () => {
     // State for form inputs

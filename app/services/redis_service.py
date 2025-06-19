@@ -148,7 +148,7 @@ class ImageCacheService:
             image_hash: Hash of the processed image
             expiry: Cache expiry time in seconds
             user_id: ID of the user who created this version (optional)
-        
+            
         Returns:
             bool: Success status
         """
