@@ -233,12 +233,12 @@ const ImageProcessingPage = () => {
     };
 
     return (
-        <div>
+        <div className="image-processing-page">
             <div className="image-processing-container">
-                <h1>
+                <h1 className="image-processing-title">
                     Image Processing
-
                 </h1>
+                
                 {error && (
                     <div className="image-processing-error">
                         {error}
@@ -246,28 +246,34 @@ const ImageProcessingPage = () => {
                 )}
 
                 {successMessage && (
-                    <div>
+                    <div className="image-processing-success">
                         {successMessage}
                     </div>
                 )}
 
                 {/* Image Source Selection */}
-                <div>
-                    <h2>
+                <div className="image-source-section">
+                    <h2 className="section-title">
                         Image Source
-
                     </h2>
                     <div className="image-source-tabs">
-                        <button onClick={() => handleImageSourceChange('upload')}>
+                        <button 
+                            className={`source-tab ${imageSource === 'upload' ? 'active' : ''}`}
+                            onClick={() => handleImageSourceChange('upload')}
+                        >
                             Upload Image
                         </button>
-                        <button onClick={() => handleImageSourceChange('url')}>
+                        <button 
+                            className={`source-tab ${imageSource === 'url' ? 'active' : ''}`}
+                            onClick={() => handleImageSourceChange('url')}
+                        >
                             Image URL
                         </button>
                     </div>
+                    
                     {/* Upload Interface */}
                     {imageSource === 'upload' && (
-                        <div>
+                        <div className="upload-section">
                             <input
                                 type="file"
                                 accept="image/*"
@@ -286,21 +292,11 @@ const ImageProcessingPage = () => {
                                         alt="Preview"
                                         className="image-preview"
                                     />
-
                                 ) : (
                                     <div className="upload-placeholder">
-                                        <span>
-                                            📁
-
-                                        </span>
-                                        <p>
-                                            Click to select an image
-
-                                        </p>
-                                        <p>
-                                            JPEG, PNG or GIF, max 10MB
-
-                                        </p>
+                                        <span className="upload-icon">📁</span>
+                                        <p className="upload-text">Click to select an image</p>
+                                        <p className="upload-hint">JPEG, PNG or GIF, max 10MB</p>
                                     </div>
                                 )}
                             </div>
@@ -309,7 +305,7 @@ const ImageProcessingPage = () => {
 
                     {/* URL Interface */}
                     {imageSource === 'url' && (
-                        <div>
+                        <div className="url-section">
                             <div className="url-input-group">
                                 <input
                                     type="text"
@@ -324,47 +320,46 @@ const ImageProcessingPage = () => {
                 </div>
 
                 {/* Processing Options */}
-                <div>
-                    <h2>
+                <div className="processing-options-section">
+                    <h2 className="section-title">
                         Processing Options
-
                     </h2>
+                    
                     {/* Grayscale */}
                     <div className="option-container">
                         <div className="option-header">
-                            <label>
+                            <label className="option-label">
                                 <input
                                     type="checkbox"
                                     checked={transformations.grayscale}
                                     onChange={() => toggleTransformation('grayscale')}
+                                    className="option-checkbox"
                                 />
-                                Grayscale
+                                <span className="option-text">Grayscale</span>
                             </label>
                         </div>
-                        <div>
+                        <div className="option-description">
                             Convert image to black and white
                         </div>
                     </div>
 
                     {/* Blur */}
-                    <div>
+                    <div className="option-container">
                         <div className="option-header">
-                            <label>
+                            <label className="option-label">
                                 <input
                                     type="checkbox"
                                     checked={transformations.blur.apply}
                                     onChange={() => toggleTransformation('blur')}
+                                    className="option-checkbox"
                                 />
-                                Blur
+                                <span className="option-text">Blur</span>
                             </label>
                         </div>
                         {transformations.blur.apply && (
-                            <div>
+                            <div className="option-params">
                                 <div className="param-row">
-                                    <label>
-                                        Radius:
-
-                                    </label>
+                                    <label className="param-label">Radius:</label>
                                     <input
                                         type="number"
                                         min="1"
@@ -373,82 +368,66 @@ const ImageProcessingPage = () => {
                                         onChange={(e) => handleNumericInput(e, 'blur', 'radius', 1, 50)}
                                         className="param-input"
                                     />
-                                    <span>
-                                        (1-50)
-
-                                    </span>
+                                    <span className="param-hint">(1-50)</span>
                                 </div>
                             </div>
                         )}
-                        <div>
+                        <div className="option-description">
                             Apply Gaussian blur to the image
                         </div>
                     </div>
 
                     {/* Rotate */}
-                    <div>
+                    <div className="option-container">
                         <div className="option-header">
-                            <label>
+                            <label className="option-label">
                                 <input
                                     type="checkbox"
                                     checked={transformations.rotate.apply}
                                     onChange={() => toggleTransformation('rotate')}
+                                    className="option-checkbox"
                                 />
-                                Rotate
+                                <span className="option-text">Rotate</span>
                             </label>
                         </div>
                         {transformations.rotate.apply && (
-                            <div>
+                            <div className="option-params">
                                 <div className="param-row">
-                                    <label>
-                                        Angle:
-
-                                    </label>
-                                    <select onChange={(e) =>
-                                        updateTransformationParams('rotate', 'angle', parseInt(e.target.value, 10))}
+                                    <label className="param-label">Angle:</label>
+                                    <select 
+                                        onChange={(e) =>
+                                            updateTransformationParams('rotate', 'angle', parseInt(e.target.value, 10))}
                                         className="param-select"
                                     >
-
-                                        <option>
-                                            90°
-
-                                        </option>
-                                        <option>
-                                            180°
-
-                                        </option>
-                                        <option>
-                                            270°
-
-                                        </option>
+                                        <option value="90">90°</option>
+                                        <option value="180">180°</option>
+                                        <option value="270">270°</option>
                                     </select>
                                 </div>
                             </div>
                         )}
-                        <div>
+                        <div className="option-description">
                             Rotate the image by a specified angle
                         </div>
                     </div>
 
                     {/* Resize */}
-                    <div>
+                    <div className="option-container">
                         <div className="option-header">
-                            <label>
+                            <label className="option-label">
                                 <input
                                     type="checkbox"
                                     checked={transformations.resize.apply}
                                     onChange={() => toggleTransformation('resize')}
+                                    className="option-checkbox"
                                 />
-                                Resize
+                                <span className="option-text">Resize</span>
                             </label>
                         </div>
                         {transformations.resize.apply && (
-                            <div>
+                            <div className="option-params">
                                 <div className="param-row">
-                                    <label>
-                                        Width:
-
-                                    </label>
+                                    <label className="param-label">Width:</label>
                                     <input
                                         type="number"
                                         min="1"
@@ -457,16 +436,10 @@ const ImageProcessingPage = () => {
                                         onChange={(e) => handleNumericInput(e, 'resize', 'width', 1, 5000)}
                                         className="param-input"
                                     />
-                                    <span>
-                                        px
-
-                                    </span>
+                                    <span className="param-hint">px</span>
                                 </div>
                                 <div>
-                                    <label>
-                                        Height:
-
-                                    </label>
+                                    <label className="param-label">Height:</label>
                                     <input
                                         type="number"
                                         min="1"
@@ -475,46 +448,45 @@ const ImageProcessingPage = () => {
                                         onChange={(e) => handleNumericInput(e, 'resize', 'height', 1, 5000)}
                                         className="param-input"
                                     />
-                                    <span>
-                                        px
-
-                                    </span>
+                                    <span className="param-hint">px</span>
                                 </div>
                                 <div>
-                                    <label>
+                                    <label className="param-label">
                                         <input
                                             type="checkbox"
                                             checked={transformations.resize.type === "maintain_aspect_ratio"}
                                             onChange={(e) => updateTransformationParams('resize', 'type',
                                                 e.target.checked ? "maintain_aspect_ratio" : "free")}
+                                            className="param-checkbox"
                                         />
-                                        Preserve aspect ratio
+                                        <span className="param-text">Preserve aspect ratio</span>
                                     </label>
                                 </div>
                             </div>
                         )}
-                        <div>
+                        <div className="option-description">
                             Change image dimensions
                         </div>
                     </div>
 
                     {/* Background Removal */}
-                    <div>
+                    <div className="option-container">
                         <div className="option-header">
-                            <label>
+                            <label className="option-label">
                                 <input
                                     type="checkbox"
                                     checked={transformations.remove_background}
                                     onChange={() => toggleTransformation('remove_background')}
+                                    className="option-checkbox"
                                 />
-                                Background Removal
+                                <span className="option-text">Background Removal</span>
                             </label>
                         </div>
-                        <div>
+                        <div className="option-description">
                             Remove the background from the image
                         </div>
                         {transformations.remove_background && (
-                            <div>
+                            <div className="option-hint">
                                 This operation may take longer to process
                             </div>
                         )}
@@ -522,17 +494,16 @@ const ImageProcessingPage = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div>
+                <div className="action-buttons">
                     <button onClick={processImage}>
                         {isProcessing ? 'Processing...' : 'Process Image'}
                     </button>
                 </div>
                 {/* Results Section */}
                 {processedImageUrl && (
-                    <div>
-                        <h2>
+                    <div className="results-section">
+                        <h2 className="section-title">
                             Processed Image
-
                         </h2>
                         <div className="result-image-container">
                             <img
@@ -540,7 +511,6 @@ const ImageProcessingPage = () => {
                                 alt="Processed"
                                 className="result-image"
                             />
-
                         </div>
                         <div>
                             <a>
