@@ -5,6 +5,7 @@ import { AuthProvider } from './contexts/AuthContext';
 // Pages
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ImageProcessingPage from './pages/ImageProcessingPage';
 // import DashboardPage from './pages/DashboardPage';
 // import ImageEditorPage from './pages/ImageEditorPage';
 // import GalleryPage from './pages/GalleryPage';
@@ -25,53 +26,13 @@ const App = () => {
                 <div>
                     <Routes>
                         {/* Public routes */}
-
-
-                        <Route path="/register" element={<RegisterPage />
-
-                        } />
-                        <Route path="/login" element={<LoginPage />
-                        } />
+                        <Route path="/register" element={<RegisterPage />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/dashboard" element={<ImageProcessingPage />} />
 
                         {/* Protected routes */}
-                        {/* <Route element={<ProtectedRoute />
-
-                        }>
-
-                            <Route path="/" element={<Navigate to="/dashboard" replace />
-
-                            } />
-                            <Route path="/dashboard" element={
-                                <>
-
-                                    <Header />
-                                    <DashboardPage />
-                                </>
-                            } />
-                            <Route path="/editor" element={
-                                <>
-                                    <Header />
-                                    <ImageEditorPage />
-                                </>
-                            } />
-                            <Route path="/gallery" element={
-                                <>
-                                    <Header />
-                                    <GalleryPage />
-                                </>
-                            } />
-                            <Route path="/profile" element={
-                                <>
-                                    <Header />
-                                    <ProfilePage />
-                                </>
-                            } />
-                        </Route> */}
-                        {/* 404 route */}
-                        {/* <Route path="*" element={<NotFoundPage /> */}
-
-                        {/* } /> */}
-
+                        <Route element={<ProtectedRoute />}></Route>
+                        {/* 404 route can be added here if needed */}
                     </Routes>
                 </div>
             </Router>
