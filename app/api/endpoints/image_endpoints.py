@@ -11,18 +11,27 @@ from flasgger import swag_from
 from app.services.redis_service import ImageCacheService
 import json
 from app.services.mongodb_service import ImageMetadataService
+from app.middleware.auth_middleware import auth_required, optional_auth, admin_required
 
 
 image_bp = Blueprint('image', __name__)
 
 @image_bp.route('/upload', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Upload an image file",
-    "description": "Upload an image file to the server",
+    "description": "Upload an image file to the server. Authentication required.",
     "consumes": ["multipart/form-data"],
     "produces": ["application/json"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image",
             "in": "formData",
@@ -40,6 +49,12 @@ image_bp = Blueprint('image', __name__)
         },
         "400": {
             "description": "Bad request",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        },
+        "401": {
+            "description": "Authentication required",
             "schema": {
                 "$ref": "#/components/schemas/Error"
             }
@@ -62,20 +77,33 @@ def upload_image():
     filename, file_path = save_uploaded_file(file)
     
     if filename:
+        # Get the user ID from the authenticated request
+        user_id = request.user_id
+        
         # Log the upload operation
         log_operation(
             image_name=filename,
             operation="upload",
             source_type="upload",
-            details={"original_filename": file.filename, "saved_path": file_path}
+            details={"original_filename": file.filename, "saved_path": file_path, "user_id": user_id}
         )
         
         # Process the image (placeholder for now)
         result = process_image(file_path)
         
+        # Store metadata with user ID
+        metadata_id = ImageMetadataService.save_original_image(
+            filename=filename,
+            file_path=file_path,
+            original_filename=file.filename,
+            source_type="upload",
+            user_id=user_id  # Add user tracking
+        )
+        
         return jsonify({
             'message': 'Image successfully uploaded',
             'filename': filename,
+            'metadata_id': metadata_id,
             'processing': result
         }), 200
     
@@ -85,12 +113,13 @@ def upload_image():
         operation="upload",
         source_type="upload",
         status="error",
-        details={"error": "File type not allowed"}
+        details={"error": "File type not allowed", "user_id": request.user_id}
     )
     
     return jsonify({'error': 'File type not allowed'}), 400
 
 @image_bp.route('/grayscale', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Convert uploaded image to grayscale",
@@ -98,6 +127,13 @@ def upload_image():
     "consumes": ["multipart/form-data"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image",
             "in": "formData",
@@ -185,6 +221,7 @@ def grayscale_image():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/grayscale-url', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Convert image from URL to grayscale",
@@ -192,6 +229,13 @@ def grayscale_image():
     "consumes": ["application/json"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "body",
             "in": "body",
@@ -302,12 +346,20 @@ def grayscale_image_from_url():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/logs', methods=['GET'])
+@auth_required
 @swag_from({
     "tags": ["Logs"],
     "summary": "Get operation logs",
     "description": "Retrieve logs of image processing operations with optional filtering",
     "produces": ["application/json"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "limit",
             "in": "query",
@@ -365,12 +417,20 @@ def get_logs():
     return jsonify(logs), 200
 
 @image_bp.route('/history', methods=['GET'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Get image processing history",
     "description": "Retrieve history of image uploads and processing from MongoDB",
     "produces": ["application/json"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "limit",
             "in": "query",
@@ -444,11 +504,21 @@ def get_image_history():
     return jsonify(history), 200
 
 @image_bp.route('/cache/stats', methods=['GET'])
+@auth_required
 @swag_from({
     "tags": ["Cache Management"],
     "summary": "Get cache statistics",
     "description": "View statistics about the Redis image cache",
     "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        }
+    ],
     "responses": {
         "200": {
             "description": "Cache statistics",
@@ -495,11 +565,21 @@ def get_cache_stats():
     }), 200
 
 @image_bp.route('/cache/clear', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Cache Management"],
     "summary": "Clear the image cache",
     "description": "Remove all cached image processing results from Redis",
     "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        }
+    ],
     "responses": {
         "200": {
             "description": "Cache cleared",
@@ -529,6 +609,7 @@ def clear_cache():
         }), 500
     
 @image_bp.route('/blur', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Apply blur filter to an uploaded image",
@@ -536,6 +617,13 @@ def clear_cache():
     "consumes": ["multipart/form-data"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image",
             "in": "formData",
@@ -640,6 +728,7 @@ def blur_image():
 
 
 @image_bp.route('/blur-url', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Apply blur filter to image from URL",
@@ -647,6 +736,13 @@ def blur_image():
     "consumes": ["application/json"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "body",
             "in": "body",
@@ -771,6 +867,7 @@ def blur_image_from_url():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/rotate', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Rotate an uploaded image",
@@ -778,6 +875,13 @@ def blur_image_from_url():
     "consumes": ["multipart/form-data"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image",
             "in": "formData",
@@ -879,6 +983,7 @@ def rotate_image_endpoint():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/rotate-url', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Rotate an image from URL",
@@ -886,6 +991,13 @@ def rotate_image_endpoint():
     "consumes": ["application/json"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "body",
             "in": "body",
@@ -1008,6 +1120,7 @@ def rotate_image_from_url():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/resize', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Resize an uploaded image",
@@ -1015,6 +1128,13 @@ def rotate_image_from_url():
     "consumes": ["multipart/form-data"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image",
             "in": "formData",
@@ -1155,6 +1275,7 @@ def resize_image_endpoint():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/resize-url', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Resize an image from URL",
@@ -1162,6 +1283,13 @@ def resize_image_endpoint():
     "consumes": ["application/json"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "body",
             "in": "body",
@@ -1313,6 +1441,7 @@ def resize_image_from_url():
     return jsonify({'error': 'Error processing image'}), 500
 
 @image_bp.route('/remove-background', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Remove background from an uploaded image",
@@ -1320,6 +1449,13 @@ def resize_image_from_url():
     "consumes": ["multipart/form-data"],
     "produces": ["image/png"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image",
             "in": "formData",
@@ -1413,6 +1549,7 @@ def remove_background_endpoint():
         return jsonify({'error': str(e)}), 500
     
 @image_bp.route('/remove-background-url', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Remove background from an image at URL",
@@ -1420,6 +1557,13 @@ def remove_background_endpoint():
     "consumes": ["application/json"],
     "produces": ["image/png"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "body",
             "in": "body",
@@ -1536,6 +1680,7 @@ def remove_background_from_url():
         return jsonify({'error': str(e)}), 500
     
 @image_bp.route('/transform', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Apply multiple transformations to an uploaded image",
@@ -1543,6 +1688,13 @@ def remove_background_from_url():
     "consumes": ["multipart/form-data"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image",
             "in": "formData",
@@ -1677,6 +1829,7 @@ def transform_image_endpoint():
         return jsonify({'error': str(e)}), 500
 
 @image_bp.route('/transform-url', methods=['POST'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Apply multiple transformations to an image at URL",
@@ -1684,6 +1837,13 @@ def transform_image_endpoint():
     "consumes": ["application/json"],
     "produces": ["image/*"],
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "body",
             "in": "body",
@@ -1894,11 +2054,19 @@ def transform_image_from_url():
         return jsonify({'error': str(e)}), 500
 
 @image_bp.route('/versions/<image_id>', methods=['GET'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Get version information for an image",
     "description": "Retrieve information about all versions of an image, including the original and all processed versions.",
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image_id",
             "in": "path",
@@ -1993,11 +2161,19 @@ def get_image_versions(image_id):
         return jsonify({'error': str(e)}), 500
 
 @image_bp.route('/versions/<image_id>/<int:version_number>', methods=['GET'])
+@auth_required
 @swag_from({
     "tags": ["Image Operations"],
     "summary": "Get a specific version of an image",
     "description": "Retrieve a specific version of an image by its version number.",
     "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
         {
             "name": "image_id",
             "in": "path",
@@ -2058,3 +2234,155 @@ def get_image_version(image_id, version_number):
     except Exception as e:
         current_app.logger.error(f"Error getting image version: {str(e)}")
         return jsonify({'error': str(e)}), 500
+    
+@image_bp.route('/my-images', methods=['GET'])
+@auth_required
+@swag_from({
+    "tags": ["User Operations"],
+    "summary": "Get user's images",
+    "description": "Retrieve all images uploaded or processed by the current user",
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        },
+        {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum number of images to return",
+            "required": False,
+            "type": "integer",
+            "default": 10
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "List of user's images",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "total": {
+                        "type": "integer",
+                        "description": "Total number of images"
+                    }
+                }
+            }
+        },
+        "401": {
+            "description": "Authentication required",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def get_user_images():
+    """Get images uploaded or processed by the current user"""
+    # Get user ID from authenticated request
+    user_id = request.user_id
+    
+    # Get limit parameter
+    limit = int(request.args.get('limit', 10))
+    
+    # Initialize MongoDB service instance
+    mongo_service = ImageMetadataService(current_app.db)
+    
+    # Get images uploaded by this user
+    uploads = mongo_service.get_user_images(user_id, limit=limit)
+    
+    # Convert ObjectId to string for JSON serialization
+    for img in uploads:
+        if '_id' in img:
+            img['_id'] = str(img['_id'])
+            
+    # Get total count for pagination
+    total_images = mongo_service.images_collection.count_documents({"user_id": user_id})
+    
+    return jsonify({
+        "images": uploads,
+        "total": total_images
+    }), 200
+
+@image_bp.route('/my-statistics', methods=['GET'])
+@auth_required
+@swag_from({
+    "tags": ["User Operations"],
+    "summary": "Get user statistics",
+    "description": "Retrieve statistics about the current user's image processing activities",
+    "produces": ["application/json"],
+    "parameters": [
+        {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer token for authentication",
+            "required": True,
+            "type": "string"
+        }
+    ],
+    "responses": {
+        "200": {
+            "description": "User statistics",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "string",
+                        "description": "User ID"
+                    },
+                    "total_uploads": {
+                        "type": "integer",
+                        "description": "Total number of uploaded images"
+                    },
+                    "total_versions": {
+                        "type": "integer",
+                        "description": "Total number of image versions created"
+                    },
+                    "operations_by_type": {
+                        "type": "object",
+                        "description": "Number of operations by type"
+                    },
+                    "recent_uploads": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "recent_operations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    }
+                }
+            }
+        },
+        "401": {
+            "description": "Authentication required",
+            "schema": {
+                "$ref": "#/components/schemas/Error"
+            }
+        }
+    }
+})
+def get_user_statistics():
+    """Get statistics about the current user's image processing activities"""
+    # Get user ID from authenticated request
+    user_id = request.user_id
+    
+    # Get user statistics
+    stats = ImageMetadataService.get_user_statistics(user_id)
+    
+    if not stats:
+        return jsonify({"error": "Could not retrieve user statistics"}), 400
+    
+    return jsonify(stats), 200

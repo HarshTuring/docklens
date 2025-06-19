@@ -21,6 +21,7 @@ class ImageMetadataService:
         self.images_collection.create_index("image_hash")
         self.images_collection.create_index("upload_date")
         self.images_collection.create_index("source_url")  # Add index for source_url
+        self.images_collection.create_index("user_id")  # Add index for user lookups
         
         # Indexes for versions
         self.versions_collection.create_index("original_image_id")
@@ -30,12 +31,27 @@ class ImageMetadataService:
         ], unique=True)
         self.versions_collection.create_index("created_date")
         self.versions_collection.create_index("version_number")
+        self.versions_collection.create_index("user_id")  # Add index for user lookups
     
     # Original image methods
     
     def store_original_image(self, filename, file_path, original_filename, image_hash, 
-                            source_type="upload", source_url=None):
-        """Store metadata for an original uploaded image."""
+                           source_type="upload", source_url=None, user_id=None):
+        """
+        Store metadata for an original uploaded image.
+        
+        Args:
+            filename: Current filename in the storage
+            file_path: Full path to the stored file
+            original_filename: Original name of the uploaded file
+            image_hash: Hash of the image content
+            source_type: How the image was obtained ('upload' or 'url')
+            source_url: Source URL if applicable
+            user_id: ID of the user who uploaded the image
+            
+        Returns:
+            str: MongoDB document ID
+        """
         # Check if image already exists by file_path
         existing_image = self.images_collection.find_one({"file_path": file_path})
         if existing_image:
@@ -50,7 +66,8 @@ class ImageMetadataService:
             "source_type": source_type,
             "source_url": source_url,
             "upload_date": datetime.datetime.utcnow(),
-            "version_count": 0
+            "version_count": 0,
+            "user_id": user_id  # Store user ID in metadata
         }
         
         result = self.images_collection.insert_one(image_data)
@@ -82,9 +99,22 @@ class ImageMetadataService:
         except Exception:
             return False
     
-    def get_recent_uploads(self, limit=10):
-        """Get recent image uploads."""
-        return list(self.images_collection.find().sort("upload_date", -1).limit(limit))
+    def get_recent_uploads(self, limit=10, user_id=None):
+        """
+        Get recent image uploads.
+        
+        Args:
+            limit: Maximum number of records to return
+            user_id: Optional user ID to filter results by user
+            
+        Returns:
+            list: Recent upload records
+        """
+        query = {}
+        if user_id:
+            query["user_id"] = user_id
+            
+        return list(self.images_collection.find(query).sort("upload_date", -1).limit(limit))
     
     # Version methods
     
@@ -104,8 +134,20 @@ class ImageMetadataService:
             return highest_version["version_number"] + 1
         return 1
     
-    def create_image_version(self, original_image_id, processed_path, operation_params, image_hash):
-        """Create a new version of an image."""
+    def create_image_version(self, original_image_id, processed_path, operation_params, image_hash, user_id=None):
+        """
+        Create a new version of an image.
+        
+        Args:
+            original_image_id: ID of the original image
+            processed_path: Path to the processed image
+            operation_params: Parameters used for processing
+            image_hash: Hash of the processed image content
+            user_id: ID of the user who created this version
+            
+        Returns:
+            tuple: (version_id, processed_path, is_cached)
+        """
         # Generate operation parameter hash
         operation_param_hash = self.generate_operation_param_hash(operation_params)
         
@@ -129,7 +171,8 @@ class ImageMetadataService:
             "version_number": version_number,
             "image_hash": image_hash,
             "operation_param_hash": operation_param_hash,
-            "operation_params": operation_params  # Store the actual parameters for reference
+            "operation_params": operation_params,  # Store the actual parameters for reference
+            "user_id": user_id  # Store user ID with the version
         }
         
         result = self.versions_collection.insert_one(version_data)
@@ -148,12 +191,23 @@ class ImageMetadataService:
             "operation_param_hash": operation_param_hash
         })
     
-    def get_image_versions(self, image_id):
-        """Get all versions of an image."""
+    def get_image_versions(self, image_id, user_id=None):
+        """
+        Get all versions of an image.
+        
+        Args:
+            image_id: ID of the original image
+            user_id: Optional user ID to filter versions by user
+            
+        Returns:
+            list: All matching versions of the image
+        """
         try:
-            versions = self.versions_collection.find(
-                {"original_image_id": image_id}
-            ).sort("version_number", 1)
+            query = {"original_image_id": image_id}
+            if user_id:
+                query["user_id"] = user_id
+                
+            versions = self.versions_collection.find(query).sort("version_number", 1)
             
             return list(versions)
         except Exception:
@@ -187,8 +241,20 @@ class ImageMetadataService:
     
     # Combined operations
     
-    def get_or_create_version(self, original_image_id, operation_params, processed_path, image_hash):
-        """Get an existing version or create a new one."""
+    def get_or_create_version(self, original_image_id, operation_params, processed_path, image_hash, user_id=None):
+        """
+        Get an existing version or create a new one.
+        
+        Args:
+            original_image_id: ID of the original image
+            operation_params: Parameters used for processing
+            processed_path: Path to the processed image
+            image_hash: Hash of the processed image content
+            user_id: ID of the user performing this operation
+            
+        Returns:
+            tuple: (version_id, processed_path, is_cached)
+        """
         # Check if version exists
         existing_version = self.find_version_by_params(original_image_id, operation_params)
         
@@ -200,7 +266,8 @@ class ImageMetadataService:
             original_image_id, 
             processed_path, 
             operation_params, 
-            image_hash
+            image_hash,
+            user_id  # Pass the user ID to create_image_version
         )
     
     def get_version_stats(self, image_id):
@@ -216,13 +283,99 @@ class ImageMetadataService:
                 "original_filename": original_image["original_filename"],
                 "upload_date": original_image["upload_date"],
                 "source_type": original_image["source_type"],
+                "user_id": original_image.get("user_id"),  # Include user who uploaded the original
                 "total_versions": len(versions),
                 "latest_version": max([v["version_number"] for v in versions]) if versions else 0,
                 "latest_processing_date": max([v["created_date"] for v in versions]) if versions else None
             }
         except Exception:
             return None
-
+    
+    # User-specific operations
+    
+    def get_user_images(self, user_id, limit=10, skip=0):
+        """
+        Get images uploaded by a specific user.
+        
+        Args:
+            user_id: ID of the user
+            limit: Maximum number of records to return
+            skip: Number of records to skip (for pagination)
+            
+        Returns:
+            list: Images uploaded by the user
+        """
+        if not user_id:
+            return []
+            
+        return list(self.images_collection.find(
+            {"user_id": user_id}
+        ).sort("upload_date", -1).skip(skip).limit(limit))
+    
+    def get_user_versions(self, user_id, limit=10, skip=0):
+        """
+        Get versions created by a specific user.
+        
+        Args:
+            user_id: ID of the user
+            limit: Maximum number of records to return
+            skip: Number of records to skip (for pagination)
+            
+        Returns:
+            list: Versions created by the user
+        """
+        if not user_id:
+            return []
+            
+        return list(self.versions_collection.find(
+            {"user_id": user_id}
+        ).sort("created_date", -1).skip(skip).limit(limit))
+    
+    def get_user_stats(self, user_id):
+        """
+        Get statistics about a user's activity.
+        
+        Args:
+            user_id: ID of the user
+            
+        Returns:
+            dict: User activity statistics
+        """
+        if not user_id:
+            return None
+            
+        # Count uploads
+        upload_count = self.images_collection.count_documents({"user_id": user_id})
+        
+        # Count versions created
+        version_count = self.versions_collection.count_documents({"user_id": user_id})
+        
+        # Get operation types breakdown
+        pipeline = [
+            {"$match": {"user_id": user_id}},
+            {"$group": {
+                "_id": {"$arrayElemAt": [{"$split": ["$operation_params.operation", "_"]}, 0]},
+                "count": {"$sum": 1}
+            }}
+        ]
+        operations = list(self.versions_collection.aggregate(pipeline))
+        
+        # Get recent activity
+        recent_uploads = self.get_user_images(user_id, limit=5)
+        recent_versions = self.get_user_versions(user_id, limit=5)
+        
+        # Compile statistics
+        return {
+            "user_id": user_id,
+            "total_uploads": upload_count,
+            "total_versions": version_count,
+            "operations_by_type": {op["_id"]: op["count"] for op in operations},
+            "recent_uploads": recent_uploads,
+            "recent_versions": recent_versions
+        }
+    
+    # Class methods for direct use without instantiation
+    
     @classmethod
     def is_url_processed(cls, url):
         """
@@ -247,7 +400,7 @@ class ImageMetadataService:
             return False, None
 
     @classmethod
-    def save_upload_metadata(cls, filename, file_path, original_filename, source_type="upload", source_url=None):
+    def save_upload_metadata(cls, filename, file_path, original_filename, source_type="upload", source_url=None, user_id=None):
         """
         Save metadata for an uploaded image.
         
@@ -257,6 +410,7 @@ class ImageMetadataService:
             original_filename: Original filename from upload
             source_type: Type of upload (upload, url)
             source_url: URL if source_type is url
+            user_id: ID of the user who uploaded the image
             
         Returns:
             str: ID of the saved record
@@ -271,7 +425,8 @@ class ImageMetadataService:
                 "source_type": source_type,
                 "source_url": source_url,
                 "upload_date": datetime.datetime.utcnow(),
-                "version_count": 0
+                "version_count": 0,
+                "user_id": user_id  # Store user ID
             }
             
             # Insert record
@@ -300,7 +455,7 @@ class ImageMetadataService:
             return None
 
     @classmethod
-    def save_original_image(cls, filename, file_path, original_filename, source_type="upload", source_url=None):
+    def save_original_image(cls, filename, file_path, original_filename, source_type="upload", source_url=None, user_id=None):
         """
         Save metadata for an original image.
         
@@ -310,6 +465,7 @@ class ImageMetadataService:
             original_filename: Original filename
             source_type: Type of upload (upload, url)
             source_url: URL if source_type is url
+            user_id: ID of the user who uploaded the image
             
         Returns:
             str: ID of the saved record
@@ -324,7 +480,8 @@ class ImageMetadataService:
                 "source_type": source_type,
                 "source_url": source_url,
                 "upload_date": datetime.datetime.utcnow(),
-                "version_count": 0
+                "version_count": 0,
+                "user_id": user_id  # Store user ID
             }
             
             # Insert record
@@ -360,7 +517,7 @@ class ImageMetadataService:
             return 1
 
     @classmethod
-    def create_image_version(cls, original_image_id, processed_path, operation_params):
+    def create_image_version(cls, original_image_id, processed_path, operation_params, user_id=None):
         """
         Create a new version of an image.
         
@@ -368,6 +525,7 @@ class ImageMetadataService:
             original_image_id: ID of the original image
             processed_path: Path to the processed image
             operation_params: Parameters used for processing
+            user_id: ID of the user who created this version
             
         Returns:
             str: ID of the created version
@@ -387,7 +545,8 @@ class ImageMetadataService:
                 "created_date": datetime.datetime.utcnow(),
                 "version_number": version_number,
                 "operation_param_hash": operation_param_hash,
-                "operation_params": operation_params
+                "operation_params": operation_params,
+                "user_id": user_id  # Store user ID
             }
             
             result = db.image_versions.insert_one(version_data)
@@ -416,3 +575,72 @@ class ImageMetadataService:
         """
         params_str = json.dumps(operation_params, sort_keys=True)
         return hashlib.sha256(params_str.encode()).hexdigest()
+        
+    @classmethod
+    def get_user_statistics(cls, user_id):
+        """
+        Get comprehensive statistics about a user's activity.
+        
+        Args:
+            user_id: ID of the user
+            
+        Returns:
+            dict: User activity statistics
+        """
+        try:
+            if not user_id:
+                return None
+                
+            db = current_app.db
+            
+            # Count uploads
+            upload_count = db.images.count_documents({"user_id": user_id})
+            
+            # Count versions created
+            version_count = db.image_versions.count_documents({"user_id": user_id})
+            
+            # Get operation types breakdown
+            pipeline = [
+                {"$match": {"user_id": user_id}},
+                {"$group": {
+                    "_id": {"$arrayElemAt": [{"$split": [{"$ifNull": ["$operation_params.operation", "other"]}, "_"]}, 0]},
+                    "count": {"$sum": 1}
+                }}
+            ]
+            operations = list(db.image_versions.aggregate(pipeline))
+            
+            # Get recent uploads
+            recent_uploads = list(db.images.find(
+                {"user_id": user_id},
+                {"_id": 1, "filename": 1, "original_filename": 1, "upload_date": 1}
+            ).sort("upload_date", -1).limit(5))
+            
+            # Get recent operations
+            recent_operations = list(db.image_versions.find(
+                {"user_id": user_id},
+                {"_id": 1, "original_image_id": 1, "operation_params": 1, "created_date": 1}
+            ).sort("created_date", -1).limit(5))
+            
+            # Convert ObjectId to string for serialization
+            for upload in recent_uploads:
+                if "_id" in upload:
+                    upload["_id"] = str(upload["_id"])
+                    
+            for op in recent_operations:
+                if "_id" in op:
+                    op["_id"] = str(op["_id"])
+                if "original_image_id" in op:
+                    op["original_image_id"] = str(op["original_image_id"])
+            
+            # Compile statistics
+            return {
+                "user_id": user_id,
+                "total_uploads": upload_count,
+                "total_versions": version_count,
+                "operations_by_type": {op["_id"]: op["count"] for op in operations if op["_id"]},
+                "recent_uploads": recent_uploads,
+                "recent_operations": recent_operations
+            }
+        except Exception as e:
+            current_app.logger.error(f"Error getting user statistics: {str(e)}")
+            return None
