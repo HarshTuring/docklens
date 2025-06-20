@@ -42,8 +42,8 @@ def create_app():
     
     # Setup CORS
     CORS(app, resources={
-        r"/auth/*": {"origins": "*"},  # JWT auth endpoints can be called from anywhere
-        r"/users/*": {"origins": os.environ.get('ALLOWED_ORIGINS', '*').split(',')}  # User endpoints more restricted
+        r"/auth/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5003", "http://127.0.0.1:5003"]},  # JWT auth endpoints can be called from frontend
+        r"/users/*": {"origins": ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5003", "http://127.0.0.1:5003"]}  # User endpoints more restricted
     })
     
     # Setup Flasgger
