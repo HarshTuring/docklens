@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 import '../styles/global.scss';
 import '../styles/components/auth.scss';
@@ -47,7 +47,7 @@ const LoginPage = () => {
 
                 <form className="login-form">
                     <div className="login-form-group">
-                        <label className="login-label">
+                        <label className="login-label" htmlFor="email">
                             Email
                         </label>
                         <input
@@ -62,7 +62,7 @@ const LoginPage = () => {
                         />
                     </div>
                     <div className="login-form-group">
-                        <label className="login-label">
+                        <label className="login-label" htmlFor="password">
                             Password
                         </label>
                         <input

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { useAuth } from '../contexts/AuthContext';
 
 const RegisterPage = () => {
@@ -80,7 +80,7 @@ const RegisterPage = () => {
 
                 <form className="register-form">
                     <div className="register-form-group">
-                        <label className="register-label">
+                        <label className="register-label" htmlFor="first_name">
                             First Name
                         </label>
                         <input
@@ -94,7 +94,7 @@ const RegisterPage = () => {
                         />
                     </div>
                     <div className="register-form-group">
-                        <label className="register-label">
+                        <label className="register-label" htmlFor="last_name">
                             Last Name
                         </label>
                         <input
@@ -108,7 +108,7 @@ const RegisterPage = () => {
                         />
                     </div>
                     <div className="register-form-group">
-                        <label className="register-label">
+                        <label className="register-label" htmlFor="email">
                             Email
                         </label>
                         <input
@@ -127,7 +127,7 @@ const RegisterPage = () => {
                         }
                     </div>
                     <div className="register-form-group">
-                        <label className="register-label">
+                        <label className="register-label" htmlFor="password">
                             Password
                         </label>
                         <input
@@ -146,7 +146,7 @@ const RegisterPage = () => {
                         }
                     </div>
                     <div className="register-form-group">
-                        <label className="register-label">
+                        <label className="register-label" htmlFor="confirmPassword">
                             Confirm Password
                         </label>
                         <input
