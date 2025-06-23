@@ -74,6 +74,9 @@ Docklens is a full-stack, containerized image processing platform that provides 
 - **Conversation 8**
   - Deployment and optimization of the platform
 
+  **Link:**
+  - [Docker Hub](https://drive.google.com/file/d/1N0zz55EKbJFP5ejhvPZYFAovCyBNndzH/view?usp=share_link)
+
 ## Unit Test Screenshots
 
 - [Grayscale Unit Test](https://drive.google.com/file/d/1ARpcEFjRdebxrqvVDs9gLiOG79RhIX92/view?usp=share_link)
