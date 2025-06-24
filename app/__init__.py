@@ -4,6 +4,7 @@ from app.config import get_config
 from flasgger import Swagger
 from pymongo import MongoClient
 import redis
+from flask_cors import CORS
 
 
 def create_app(config_name=None):
@@ -12,6 +13,15 @@ def create_app(config_name=None):
     
     # Load config
     app.config.from_object(get_config())
+    
+    # Setup CORS to allow frontend requests
+    CORS(app, resources={
+        r"/api/*": {
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization"]
+        }
+    })
     
     # Ensure directories exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
