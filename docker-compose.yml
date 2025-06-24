@@ -64,7 +64,23 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
-
+  frontend:
+    build:
+      context: ./frontend  # Assuming frontend code is in a directory named 'frontend'
+      dockerfile: Dockerfile
+    container_name: image-processor-frontend
+    ports:
+      - "5003:80"  # Map container port 80 to host port 5003
+    depends_on:
+      - app
+      - auth-service
+    restart: always
+    environment:
+      - REACT_APP_API_URL=http://localhost:5001
+      - REACT_APP_AUTH_URL=http://localhost:5002
+    networks:
+      - app-network  # Make sure this matches your existing network name
+      
   mongo:
     image: mongo:6.0
     ports:
